@@ -36,19 +36,45 @@ bool FSR2FeatureVk212::InitFSR2(const NVSDK_NGX_Parameter* InParameters)
 
         _contextDesc.device = Fsr212::ffxGetDeviceVK212(Device);
 
-        if (Config::Instance()->ExtendedLimits.value_or_default())
+        if (Config::Instance()->OutputScalingEnabled.value_or(false) && LowResMV())
         {
-            _contextDesc.maxRenderSize.width = RenderWidth() < DisplayWidth() ? DisplayWidth() : RenderWidth();
-            _contextDesc.maxRenderSize.height = RenderHeight() < DisplayHeight() ? DisplayHeight() : RenderHeight();
+            float ssMulti = Config::Instance()->OutputScalingMultiplier.value_or(1.5f);
+
+            if (ssMulti < 0.5f)
+            {
+                ssMulti = 0.5f;
+                Config::Instance()->OutputScalingMultiplier = ssMulti;
+            }
+            else if (ssMulti > 3.0f)
+            {
+                ssMulti = 3.0f;
+                Config::Instance()->OutputScalingMultiplier = ssMulti;
+            }
+
+            _targetWidth = static_cast<unsigned int>(DisplayWidth() * ssMulti);
+            _targetHeight = static_cast<unsigned int>(DisplayHeight() * ssMulti);
         }
         else
         {
-            _contextDesc.maxRenderSize.width = DisplayWidth();
-            _contextDesc.maxRenderSize.height = DisplayHeight();
+            _targetWidth = DisplayWidth();
+            _targetHeight = DisplayHeight();
         }
 
-        _contextDesc.displaySize.width = DisplayWidth();
-        _contextDesc.displaySize.height = DisplayHeight();
+        if (Config::Instance()->ExtendedLimits.value_or(false) && RenderWidth() > DisplayWidth())
+        {
+            _targetWidth = RenderWidth();
+            _targetHeight = RenderHeight();
+
+            // enable output scaling to restore image
+            if (LowResMV())
+            {
+                Config::Instance()->OutputScalingMultiplier.set_volatile_value(1.0f);
+                Config::Instance()->OutputScalingEnabled.set_volatile_value(true);
+            }
+        }
+
+        _contextDesc.displaySize.width = TargetWidth();
+        _contextDesc.displaySize.height = TargetHeight();
 
         _contextDesc.flags = 0;
 
@@ -101,6 +127,9 @@ bool FSR2FeatureVk212::Init(VkInstance InInstance, VkPhysicalDevice InPD, VkDevi
     if (RCAS == nullptr)
         RCAS = std::make_unique<RCAS_Vk>("RCAS", InDevice, InPD);
 
+    if (OS == nullptr)
+        OS = std::make_unique<OS_Vk>("OS", InDevice, InPD, (TargetWidth() < DisplayWidth()));
+
     return InitFSR2(InParameters);
 }
 
@@ -139,6 +168,12 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
 
     if (!IsInited())
         return false;
+
+    if (!RCAS->IsInit())
+        Config::Instance()->RcasEnabled.set_volatile_value(false);
+
+    if (!OS->IsInit())
+        Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
 
     Fsr212::FfxFsr2DispatchDescription params {};
 

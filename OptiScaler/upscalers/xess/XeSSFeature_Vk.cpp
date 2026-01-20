@@ -52,14 +52,6 @@ static xess_vk_image_view_info NV_to_XeSS(NVSDK_NGX_Resource_VK* nvResource)
     xessResource.subresourceRange.layerCount = 1;
     xessResource.subresourceRange.levelCount = 1;
 
-    // LOG_DEBUG("{}x{}, format: {}, image: {:X}, imageView: {:X}", xessResource.width, xessResource.height,
-    //           (UINT) xessResource.format, (size_t) xessResource.image, (size_t) xessResource.imageView);
-
-    // LOG_DEBUG("aspectMask: {:X}, baseArrayLayer: {}, baseMipLevel: {}, layerCount: {}, levelCount: {}",
-    //           (UINT) xessResource.subresourceRange.aspectMask, xessResource.subresourceRange.baseArrayLayer,
-    //           xessResource.subresourceRange.baseMipLevel, xessResource.subresourceRange.layerCount,
-    //           xessResource.subresourceRange.levelCount);
-
     return xessResource;
 }
 
@@ -254,128 +246,13 @@ bool XeSSFeature_Vk::Init(VkInstance InInstance, VkPhysicalDevice InPD, VkDevice
             // enable output scaling to restore image
             if (LowResMV())
             {
-                Config::Instance()->OutputScalingMultiplier = 1.0f;
-                Config::Instance()->OutputScalingEnabled = true;
+                Config::Instance()->OutputScalingMultiplier.set_volatile_value(1.0f);
+                Config::Instance()->OutputScalingEnabled.set_volatile_value(true);
             }
         }
 
         xessParams.outputResolution.x = TargetWidth();
         xessParams.outputResolution.y = TargetHeight();
-
-        /*
-        // create heaps to prevent create heap errors of xess
-        if (Config::Instance()->CreateHeaps.value_or(true))
-        {
-            HRESULT hr;
-            xess_properties_t xessProps{};
-            ret = XeSSProxy::GetProperties()(_xessContext, &xessParams.outputResolution, &xessProps);
-
-            if (ret == XESS_RESULT_SUCCESS)
-            {
-                CD3DX12_HEAP_DESC bufferHeapDesc(xessProps.tempBufferHeapSize, D3D12_HEAP_TYPE_DEFAULT);
-                Config::Instance()->SkipHeapCapture = true;
-                hr = device->CreateHeap(&bufferHeapDesc, IID_PPV_ARGS(&_localBufferHeap));
-                Config::Instance()->SkipHeapCapture = false;
-
-                if (SUCCEEDED(hr))
-                {
-                    D3D12_HEAP_DESC textureHeapDesc{ xessProps.tempTextureHeapSize,
-                        {D3D12_HEAP_TYPE_DEFAULT, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 0, 0},
-                        0, D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES };
-
-                    Config::Instance()->SkipHeapCapture = true;
-                    hr = device->CreateHeap(&textureHeapDesc, IID_PPV_ARGS(&_localTextureHeap));
-                    Config::Instance()->SkipHeapCapture = false;
-
-                    if (SUCCEEDED(hr))
-                    {
-                        Config::Instance()->CreateHeaps = true;
-
-                        LOG_DEBUG("using _localBufferHeap & _localTextureHeap!");
-
-                        xessParams.bufferHeapOffset = 0;
-                        xessParams.textureHeapOffset = 0;
-                        xessParams.pTempBufferHeap = _localBufferHeap;
-                        xessParams.pTempTextureHeap = _localTextureHeap;
-                    }
-                    else
-                    {
-                        _localBufferHeap->Release();
-                        LOG_ERROR("CreateHeap textureHeapDesc failed {0:x}!", (UINT)hr);
-                    }
-                }
-                else
-                {
-                    LOG_ERROR("CreateHeap bufferHeapDesc failed {0:x}!", (UINT)hr);
-                }
-
-            }
-            else
-            {
-                LOG_ERROR("xessGetProperties failed {0}!", ResultToString(ret));
-            }
-        }
-
-        // try to build pipelines with local pipeline object
-        if (Config::Instance()->BuildPipelines.value_or(true))
-        {
-            LOG_DEBUG("xessD3D12BuildPipelines!");
-            Config::Instance()->SkipHeapCapture = true;
-
-            ID3D12Device1* device1;
-            if (FAILED(device->QueryInterface(IID_PPV_ARGS(&device1))))
-            {
-                LOG_ERROR("QueryInterface device1 failed!");
-                ret = XeSSProxy::D3D12BuildPipelines()(_xessContext, NULL, false, xessParams.initFlags);
-            }
-            else
-            {
-                HRESULT hr = device1->CreatePipelineLibrary(nullptr, 0, IID_PPV_ARGS(&_localPipeline));
-
-                if (FAILED(hr) || !_localPipeline)
-                {
-                    LOG_ERROR("CreatePipelineLibrary failed {0:x}!", (UINT)hr);
-                    ret = XeSSProxy::D3D12BuildPipelines()(_xessContext, NULL, false, xessParams.initFlags);
-                }
-                else
-                {
-                    ret = XeSSProxy::D3D12BuildPipelines()(_xessContext, _localPipeline, false, xessParams.initFlags);
-
-                    if (ret != XESS_RESULT_SUCCESS)
-                    {
-                        LOG_ERROR("xessD3D12BuildPipelines error with _localPipeline: {0}", ResultToString(ret));
-                        ret = XeSSProxy::D3D12BuildPipelines()(_xessContext, NULL, false, xessParams.initFlags);
-                    }
-                    else
-                    {
-                        LOG_DEBUG("using _localPipelines!");
-                        xessParams.pPipelineLibrary = _localPipeline;
-                    }
-                }
-            }
-
-            if (device1 != nullptr)
-                device1->Release();
-
-            Config::Instance()->SkipHeapCapture = false;
-
-            if (ret != XESS_RESULT_SUCCESS)
-            {
-                LOG_ERROR("xessD3D12BuildPipelines error: {0}", ResultToString(ret));
-                return false;
-            }
-        }
-
-        LOG_DEBUG("xessD3D12Init!");
-
-        if (Config::Instance()->NetworkModel.has_value() && Config::Instance()->NetworkModel.value() >= 0 &&
-        Config::Instance()->NetworkModel.value() <= 5)
-        {
-            ret = XeSSProxy::SelectNetworkModel()(_xessContext,
-        (xess_network_model_t)Config::Instance()->NetworkModel.value()); LOG_ERROR("xessSelectNetworkModel result: {0}",
-        ResultToString(ret));
-        }
-        */
 
         {
             ScopedSkipHeapCapture skipHeapCapture {};
@@ -390,6 +267,9 @@ bool XeSSFeature_Vk::Init(VkInstance InInstance, VkPhysicalDevice InPD, VkDevice
 
         if (RCAS == nullptr)
             RCAS = std::make_unique<RCAS_Vk>("RCAS", InDevice, InPD);
+
+        if (OS == nullptr)
+            OS = std::make_unique<OS_Vk>("OS", InDevice, InPD, (TargetWidth() < DisplayWidth()));
     }
 
     SetInit(true);
@@ -406,6 +286,12 @@ bool XeSSFeature_Vk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* 
         LOG_ERROR("Not inited!");
         return false;
     }
+
+    if (!RCAS->IsInit())
+        Config::Instance()->RcasEnabled.set_volatile_value(false);
+
+    if (!OS->IsInit())
+        Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
 
     if (State::Instance().xessDebug)
     {
@@ -649,6 +535,37 @@ bool XeSSFeature_Vk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* 
         }
     }
 
+    if (useSS)
+    {
+        VkImage oldImage = OS->GetImage();
+
+        if (OS->CreateImageResource(Device, PhysicalDevice, TargetWidth(), TargetHeight(), params.outputTexture.format,
+                                    VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                                        VK_IMAGE_USAGE_TRANSFER_DST_BIT))
+        {
+            params.outputTexture.image = OS->GetImage();
+            params.outputTexture.imageView = OS->GetImageView();
+
+            VkImageSubresourceRange range {};
+            range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            range.baseMipLevel = 0;
+            range.levelCount = 1;
+            range.baseArrayLayer = 0;
+            range.layerCount = 1;
+
+            VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+            if (oldImage != VK_NULL_HANDLE && oldImage == params.outputTexture.image)
+                oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            OS->SetImageLayout(InCmdBuffer, params.outputTexture.image, oldLayout, VK_IMAGE_LAYOUT_GENERAL, range);
+        }
+        else
+        {
+            useSS = false;
+        }
+    }
+
     LOG_DEBUG("Executing!!");
     xessResult = XeSSProxy::VKExecute()(_xessContext, InCmdBuffer, &params);
 
@@ -656,6 +573,26 @@ bool XeSSFeature_Vk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* 
     {
         LOG_ERROR("xessVKExecute error: {0}", ResultToString(xessResult));
         return false;
+    }
+
+    if (useSS)
+    {
+        VkImageSubresourceRange range {};
+        range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        range.baseMipLevel = 0;
+        range.levelCount = 1;
+        range.baseArrayLayer = 0;
+        range.layerCount = 1;
+
+        OS->SetImageLayout(InCmdBuffer, OS->GetImage(), VK_IMAGE_LAYOUT_GENERAL,
+                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
+
+        VkExtent2D outExtent = { TargetWidth(), TargetHeight() };
+
+        if (!rcasEnabled)
+            OS->Dispatch(Device, InCmdBuffer, OS->GetImageView(), finalOutputView, outExtent);
+        else
+            OS->Dispatch(Device, InCmdBuffer, OS->GetImageView(), RCAS->GetImageView(), outExtent);
     }
 
     if (rcasEnabled)
@@ -669,7 +606,6 @@ bool XeSSFeature_Vk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* 
 
         RCAS->SetImageLayout(InCmdBuffer, RCAS->GetImage(), VK_IMAGE_LAYOUT_GENERAL,
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
-        RCAS->SetImageLayout(InCmdBuffer, finalOutputImage, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, range);
 
         RcasConstants rcasConstants {};
         rcasConstants.Sharpness = _sharpness;

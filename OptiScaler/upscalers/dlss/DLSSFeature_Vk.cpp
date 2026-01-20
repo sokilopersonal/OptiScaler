@@ -73,8 +73,14 @@ bool DLSSFeatureVk::Init(VkInstance InInstance, VkPhysicalDevice InPD, VkDevice 
 
     SetInit(initResult);
 
-    if (initResult && RCAS == nullptr)
-        RCAS = std::make_unique<RCAS_Vk>("RCAS", InDevice, InPD);
+    if (initResult)
+    {
+        if (RCAS == nullptr)
+            RCAS = std::make_unique<RCAS_Vk>("RCAS", InDevice, InPD);
+
+        if (OS == nullptr)
+            OS = std::make_unique<OS_Vk>("OS", InDevice, InPD, (TargetWidth() < DisplayWidth()));
+    }
 
     return initResult;
 }
@@ -86,6 +92,12 @@ bool DLSSFeatureVk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* I
         LOG_ERROR("nvngx.dll or _nvngx.dll is not loaded!");
         return false;
     }
+
+    if (!RCAS->IsInit())
+        Config::Instance()->RcasEnabled.set_volatile_value(false);
+
+    if (!OS->IsInit())
+        Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
 
     NVSDK_NGX_Result nvResult;
 

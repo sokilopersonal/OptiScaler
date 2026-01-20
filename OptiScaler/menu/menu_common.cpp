@@ -4652,7 +4652,7 @@ bool MenuCommon::RenderMenu()
                     if (currentFeature != nullptr && !currentFeature->IsFrozen())
                     {
                         // OUTPUT SCALING -----------------------------
-                        if (state.api == DX12 || state.api == DX11)
+                        // if (state.api == DX12 || state.api == DX11)
                         {
                             // if motion vectors are not display size
                             ImGui::BeginDisabled(!currentFeature->LowResMV());

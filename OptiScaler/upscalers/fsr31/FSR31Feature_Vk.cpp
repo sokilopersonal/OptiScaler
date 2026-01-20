@@ -193,19 +193,45 @@ bool FSR31FeatureVk::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
             LOG_INFO("contextDesc.initFlags (NonLinearColorSpace) {0:b}", _contextDesc.flags);
         }
 
-        if (Config::Instance()->ExtendedLimits.value_or_default())
+        if (Config::Instance()->OutputScalingEnabled.value_or(false) && LowResMV())
         {
-            _contextDesc.maxRenderSize.width = RenderWidth() < DisplayWidth() ? DisplayWidth() : RenderWidth();
-            _contextDesc.maxRenderSize.height = RenderHeight() < DisplayHeight() ? DisplayHeight() : RenderHeight();
+            float ssMulti = Config::Instance()->OutputScalingMultiplier.value_or(1.5f);
+
+            if (ssMulti < 0.5f)
+            {
+                ssMulti = 0.5f;
+                Config::Instance()->OutputScalingMultiplier = ssMulti;
+            }
+            else if (ssMulti > 3.0f)
+            {
+                ssMulti = 3.0f;
+                Config::Instance()->OutputScalingMultiplier = ssMulti;
+            }
+
+            _targetWidth = static_cast<unsigned int>(DisplayWidth() * ssMulti);
+            _targetHeight = static_cast<unsigned int>(DisplayHeight() * ssMulti);
         }
         else
         {
-            _contextDesc.maxRenderSize.width = DisplayWidth();
-            _contextDesc.maxRenderSize.height = DisplayHeight();
+            _targetWidth = DisplayWidth();
+            _targetHeight = DisplayHeight();
         }
 
-        _contextDesc.maxUpscaleSize.width = DisplayWidth();
-        _contextDesc.maxUpscaleSize.height = DisplayHeight();
+        if (Config::Instance()->ExtendedLimits.value_or(false) && RenderWidth() > DisplayWidth())
+        {
+            _targetWidth = RenderWidth();
+            _targetHeight = RenderHeight();
+
+            // enable output scaling to restore image
+            if (LowResMV())
+            {
+                Config::Instance()->OutputScalingMultiplier.set_volatile_value(1.0f);
+                Config::Instance()->OutputScalingEnabled.set_volatile_value(true);
+            }
+        }
+
+        _contextDesc.maxUpscaleSize.width = TargetWidth();
+        _contextDesc.maxUpscaleSize.height = TargetHeight();
 
         ffxCreateBackendVKDesc backendDesc = { 0 };
         backendDesc.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_VK;
@@ -265,6 +291,9 @@ bool FSR31FeatureVk::Init(VkInstance InInstance, VkPhysicalDevice InPD, VkDevice
     if (RCAS == nullptr)
         RCAS = std::make_unique<RCAS_Vk>("RCAS", InDevice, InPD);
 
+    if (OS == nullptr)
+        OS = std::make_unique<OS_Vk>("OS", InDevice, InPD, (TargetWidth() < DisplayWidth()));
+
     return InitFSR3(InParameters);
 }
 
@@ -274,6 +303,12 @@ bool FSR31FeatureVk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* 
 
     if (!IsInited())
         return false;
+
+    if (!RCAS->IsInit())
+        Config::Instance()->RcasEnabled.set_volatile_value(false);
+
+    if (!OS->IsInit())
+        Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
 
     struct ffxDispatchDescUpscale params = { 0 };
     params.header.type = FFX_API_DISPATCH_DESC_TYPE_UPSCALE;

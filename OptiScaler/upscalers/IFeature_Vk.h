@@ -3,6 +3,7 @@
 #include "IFeature.h"
 
 #include <shaders/rcas/RCAS_Vk.h>
+#include <shaders/output_scaling/OS_Vk.h>
 
 class IFeature_Vk : public virtual IFeature
 {
@@ -15,6 +16,7 @@ class IFeature_Vk : public virtual IFeature
     PFN_vkGetDeviceProcAddr GDPA = nullptr;
 
     std::unique_ptr<RCAS_Vk> RCAS;
+    std::unique_ptr<OS_Vk> OS;
 
   public:
     virtual bool Init(VkInstance InInstance, VkPhysicalDevice InPD, VkDevice InDevice, VkCommandBuffer InCmdList,
