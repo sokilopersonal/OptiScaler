@@ -32,6 +32,7 @@ enum class GameQuirk : uint64_t
     UseFsr2Dx11Inputs,
     UseFsr2VulkanInputs,
     ForceBorderlessWhenUsingXeFG,
+    OverrideVsyncWhenUsingXeFG,
 
     // Quirks that are applied deeper in code
     CyberpunkHudlessStateOverride,
@@ -205,17 +206,24 @@ static const QuirkEntry quirkTable[] = {
     QUIRK_ENTRY("spider-man2.exe", GameQuirk::DisableDxgiSpoofing),
 
     // Dead Space Remake
-    QUIRK_ENTRY("dead space.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceBorderlessWhenUsingXeFG),
+    // Override Vsync required to avoid crash on boot
+    QUIRK_ENTRY("dead space.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::OverrideVsyncWhenUsingXeFG,
+                GameQuirk::ForceBorderlessWhenUsingXeFG),
+
+    // Metro Exodus Enhanced Edition
+    // ForceBorderless required to avoid black screen with XeFG
+    QUIRK_ENTRY("metroexodus.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceBorderlessWhenUsingXeFG,
+                GameQuirk::ForceAutoExposure),
 
     // SL spoof enough to unlock everything DLSS/No spoof needed for DLSS inputs
     //
     // The Witcher 3, Alan Wake 2, Crysis 3 Remastered, Marvel's Guardians of the Galaxy, UNCHARTED: Legacy of Thieves
     // Collection, Warhammer 40,000: Darktide, Dying Light 2 Stay Human, Dying Light: The Beast, Observer: System Redux,
-    // Sackboy: A Big Adventure, Hellblade: Senua's Sacrifice, Pumpkin Jack, Metro Exodus Enhanced Edition, Rise of the
-    // Ronin, DYNASTY WARRIORS: ORIGINS, Crysis Remastered, Crysis 2 Remastered, Mortal Shell, Sekiro: Shadows Die
-    // Twice (for SekiroTSR mod), The Medium, NINJA GAIDEN 4 (+ WinGDK), God of War (2018), Europa
-    // Universalis V, Need for Speed Unbound, Nioh 2 – The Complete Edition, Control Ultimate Edition, Deathloop, Where
-    // Winds Meet, FINAL FANTASY VII REMAKE INTERGRADE (for Luma mod), Assassin’s Creed Shadows, Farming Simulator 2025
+    // Sackboy: A Big Adventure, Hellblade: Senua's Sacrifice, Pumpkin Jack, Rise of the Ronin, DYNASTY WARRIORS:
+    // ORIGINS, Crysis Remastered, Crysis 2 Remastered, Mortal Shell, Sekiro: Shadows Die Twice (for SekiroTSR mod), The
+    // Medium, NINJA GAIDEN 4 (+ WinGDK), God of War (2018), Europa Universalis V, Need for Speed Unbound, Nioh 2 – The
+    // Complete Edition, Control Ultimate Edition, Deathloop, Where Winds Meet, FINAL FANTASY VII REMAKE INTERGRADE (for
+    // Luma mod), Assassin’s Creed Shadows, Farming Simulator 2025
     QUIRK_ENTRY("witcher3.exe", GameQuirk::DisableDxgiSpoofing),
     QUIRK_ENTRY("alanwake2.exe", GameQuirk::DisableDxgiSpoofing),
     QUIRK_ENTRY("crysis3remastered.exe", GameQuirk::DisableDxgiSpoofing),
@@ -231,7 +239,6 @@ static const QuirkEntry quirkTable[] = {
     QUIRK_ENTRY_UE(sackboy, GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceAutoExposure),
     QUIRK_ENTRY_UE(hellbladegame, GameQuirk::DisableDxgiSpoofing),
     QUIRK_ENTRY_UE(pumpkinjack, GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceAutoExposure),
-    QUIRK_ENTRY("metroexodus.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceAutoExposure),
     QUIRK_ENTRY("ronin.exe", GameQuirk::DisableDxgiSpoofing),
     QUIRK_ENTRY("dworigins.exe", GameQuirk::DisableDxgiSpoofing),
     QUIRK_ENTRY("crysisremastered.exe", GameQuirk::DisableDxgiSpoofing),

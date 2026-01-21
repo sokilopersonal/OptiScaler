@@ -1223,8 +1223,14 @@ static void printQuirks(flag_set<GameQuirk>& quirks)
 
     if (quirks & GameQuirk::ForceBorderlessWhenUsingXeFG)
     {
-        spdlog::info("Quirk: Force borderless when using XeFG");
-        state->detectedQuirks.push_back("Force borderless when using XeFG");
+        spdlog::info("Quirk: Force Borderless when using XeFG");
+        state->detectedQuirks.push_back("Force Borderless when using XeFG");
+    }
+
+    if (quirks & GameQuirk::OverrideVsyncWhenUsingXeFG)
+    {
+        spdlog::info("Quirk: Override Vsync when using XeFG");
+        state->detectedQuirks.push_back("Override Vsync when using XeFG");
     }
 
     return;
@@ -1345,6 +1351,13 @@ static void CheckQuirks()
         State::Instance().activeFgInput != FGInput::Nukems)
     {
         Config::Instance()->FGXeFGForceBorderless.set_volatile_value(true);
+    }
+
+    if (quirks & GameQuirk::OverrideVsyncWhenUsingXeFG && !Config::Instance()->OverrideVsync.has_value() &&
+        State::Instance().activeFgOutput == FGOutput::XeFG && State::Instance().activeFgInput != FGInput::NoFG &&
+        State::Instance().activeFgInput != FGInput::Nukems)
+    {
+        Config::Instance()->OverrideVsync.set_volatile_value(true);
     }
 
     // For Luma, we assume if Luma addon in game folder it's used
