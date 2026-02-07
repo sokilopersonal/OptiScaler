@@ -23,6 +23,8 @@ class FSR31FeatureDx11on12 : public FSR31Feature, public IFeature_Dx11wDx12
     bool Init(ID3D11Device* InDevice, ID3D11DeviceContext* InContext, NVSDK_NGX_Parameter* InParameters) override;
     bool Evaluate(ID3D11DeviceContext* InDeviceContext, NVSDK_NGX_Parameter* InParameters) override;
 
+    bool IsWithDx12() final { return true; }
+
     ~FSR31FeatureDx11on12()
     {
         if (State::Instance().isShuttingDown)

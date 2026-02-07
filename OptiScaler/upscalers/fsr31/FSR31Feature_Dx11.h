@@ -101,5 +101,7 @@ class FSR31FeatureDx11 : public FSR31Feature, public IFeature_Dx11
     feature_version Version() override { return feature_version { 3, 1, 2 }; }
     std::string Name() const override { return FSR31Feature::Name(); }
 
+    bool IsWithDx12() final { return false; }
+
     ~FSR31FeatureDx11();
 };

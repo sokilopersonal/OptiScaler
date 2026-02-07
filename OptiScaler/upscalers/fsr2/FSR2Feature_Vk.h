@@ -26,4 +26,6 @@ class FSR2FeatureVk : public FSR2Feature, public IFeature_Vk
               PFN_vkGetInstanceProcAddr InGIPA, PFN_vkGetDeviceProcAddr InGDPA,
               NVSDK_NGX_Parameter* InParameters) override;
     bool Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* InParameters) override;
+
+    bool IsWithDx12() override { return false; }
 };

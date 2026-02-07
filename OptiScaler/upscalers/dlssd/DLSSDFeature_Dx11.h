@@ -14,6 +14,8 @@ class DLSSDFeatureDx11 : public DLSSDFeature, public IFeature_Dx11
     feature_version Version() override { return DLSSDFeature::Version(); }
     std::string Name() const override { return DLSSDFeature::Name(); }
 
+    bool IsWithDx12() override { return false; }
+
     DLSSDFeatureDx11(unsigned int InHandleId, NVSDK_NGX_Parameter* InParameters);
     ~DLSSDFeatureDx11();
 };

@@ -27,5 +27,7 @@ class FSR2FeatureDx11on12_212 : public FSR2Feature212, public IFeature_Dx11wDx12
 
     feature_version Version() override { return FSR2Feature212::Version(); }
 
+    bool IsWithDx12() override { return true; }
+
     ~FSR2FeatureDx11on12_212();
 };

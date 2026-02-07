@@ -25,5 +25,7 @@ class XeSSFeatureDx12 : public XeSSFeature, public IFeature_Dx12
               NVSDK_NGX_Parameter* InParameters) override;
     bool Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_NGX_Parameter* InParameters) override;
 
+    bool IsWithDx12() final { return false; }
+
     ~XeSSFeatureDx12();
 };

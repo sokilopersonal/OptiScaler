@@ -26,6 +26,8 @@ class FSR31FeatureVkOn12 : public FSR31Feature, public IFeature_VkwDx12
 
     bool Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* InParameters) override;
 
+    bool IsWithDx12() final { return true; }
+
     ~FSR31FeatureVkOn12()
     {
         if (State::Instance().isShuttingDown)

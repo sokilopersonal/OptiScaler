@@ -123,8 +123,6 @@ class IFeature_VkwDx12 : public virtual IFeature_Vk
     void ReleaseSyncResources();
 
   public:
-    bool IsWithDx12() final { return true; }
-
     bool BaseInit(VkInstance InInstance, VkPhysicalDevice InPD, VkDevice InDevice, VkCommandBuffer InCmdList,
                   PFN_vkGetInstanceProcAddr InGIPA, PFN_vkGetDeviceProcAddr InGDPA, NVSDK_NGX_Parameter* InParameters);
 

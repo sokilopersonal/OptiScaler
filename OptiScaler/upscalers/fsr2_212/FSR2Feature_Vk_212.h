@@ -26,4 +26,6 @@ class FSR2FeatureVk212 : public FSR2Feature212, public IFeature_Vk
 
     feature_version Version() override { return FSR2Feature212::Version(); }
     std::string Name() const override { return FSR2Feature212::Name(); }
+
+    bool IsWithDx12() override { return false; }
 };

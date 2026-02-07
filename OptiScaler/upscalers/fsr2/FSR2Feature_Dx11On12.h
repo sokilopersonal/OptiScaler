@@ -26,5 +26,7 @@ class FSR2FeatureDx11on12 : public FSR2Feature, public IFeature_Dx11wDx12
     bool Init(ID3D11Device* InDevice, ID3D11DeviceContext* InContext, NVSDK_NGX_Parameter* InParameters) override;
     bool Evaluate(ID3D11DeviceContext* InDeviceContext, NVSDK_NGX_Parameter* InParameters) override;
 
+    bool IsWithDx12() override { return true; }
+
     ~FSR2FeatureDx11on12();
 };

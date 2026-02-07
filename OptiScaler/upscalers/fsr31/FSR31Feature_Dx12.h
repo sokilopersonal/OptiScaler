@@ -23,6 +23,8 @@ class FSR31FeatureDx12 : public FSR31Feature, public IFeature_Dx12
     feature_version Version() override { return FSR31Feature::Version(); }
     std::string Name() const override { return FSR31Feature::Name(); }
 
+    bool IsWithDx12() final { return false; }
+
     ~FSR31FeatureDx12()
     {
         if (State::Instance().isShuttingDown)

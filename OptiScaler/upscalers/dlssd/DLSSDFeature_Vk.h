@@ -17,6 +17,8 @@ class DLSSDFeatureVk : public DLSSDFeature, public IFeature_Vk
     feature_version Version() override { return DLSSDFeature::Version(); }
     std::string Name() const override { return DLSSDFeature::Name(); }
 
+    bool IsWithDx12() override { return false; }
+
     DLSSDFeatureVk(unsigned int InHandleId, NVSDK_NGX_Parameter* InParameters);
     ~DLSSDFeatureVk();
 };

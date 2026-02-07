@@ -87,7 +87,5 @@ class IFeature_Dx11wDx12 : public virtual IFeature_Dx11
 
     IFeature_Dx11wDx12(unsigned int InHandleId, NVSDK_NGX_Parameter* InParameters);
 
-    bool IsWithDx12() final { return true; }
-
     ~IFeature_Dx11wDx12();
 };

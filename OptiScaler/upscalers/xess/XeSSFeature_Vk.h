@@ -31,6 +31,8 @@ class XeSSFeature_Vk : public virtual IFeature_Vk
               NVSDK_NGX_Parameter* InParameters) override;
     bool Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* InParameters) override;
 
+    bool IsWithDx12() final { return false; }
+
     XeSSFeature_Vk(unsigned int handleId, NVSDK_NGX_Parameter* InParameters);
     ~XeSSFeature_Vk();
 };

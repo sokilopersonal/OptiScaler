@@ -28,6 +28,8 @@ class XeSSFeature_Dx11 : public virtual IFeature_Dx11
     bool Init(ID3D11Device* InDevice, ID3D11DeviceContext* InContext, NVSDK_NGX_Parameter* InParameters) override;
     bool Evaluate(ID3D11DeviceContext* DeviceContext, NVSDK_NGX_Parameter* InParameters) override;
 
+    bool IsWithDx12() final { return false; }
+
     XeSSFeature_Dx11(unsigned int handleId, NVSDK_NGX_Parameter* InParameters);
     ~XeSSFeature_Dx11();
 };
