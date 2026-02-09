@@ -208,12 +208,12 @@ NvAPI_Status ReflexHooks::hkNvAPI_Vulkan_SetSleepMode(HANDLE vkDevice,
 
 void ReflexHooks::hookReflex(PFN_NvApi_QueryInterface& queryInterface)
 {
-#ifdef _DEBUG
-    LOG_FUNC();
-#endif
-
     if (!_inited)
     {
+#ifdef _DEBUG
+        LOG_FUNC();
+#endif
+
         o_NvAPI_D3D_SetSleepMode = GET_INTERFACE(NvAPI_D3D_SetSleepMode, queryInterface);
         o_NvAPI_D3D_Sleep = GET_INTERFACE(NvAPI_D3D_Sleep, queryInterface);
         o_NvAPI_D3D_GetLatency = GET_INTERFACE(NvAPI_D3D_GetLatency, queryInterface);
