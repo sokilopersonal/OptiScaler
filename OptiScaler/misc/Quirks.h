@@ -357,8 +357,8 @@ static const QuirkEntry quirkTable[] = {
     QUIRK_ENTRY("bg3.exe", GameQuirk::EnableVulkanExtensionSpoofing),
 
     // Arknights: Endfield (Vulkan)
-    QUIRK_ENTRY("endfield.exe", GameQuirk::DontUseNtDllHooks, GameQuirk::VulkanDLSSBarrierFixup,
-                GameQuirk::EnableVulkanSpoofing, GameQuirk::EnableVulkanExtensionSpoofing),
+    QUIRK_ENTRY("endfield.exe", GameQuirk::EnableVulkanSpoofing, GameQuirk::EnableVulkanExtensionSpoofing,
+                GameQuirk::VulkanDLSSBarrierFixup),
 
     // Indiana Jones and the Great Circle
     // VK Ext spoof needed for unlocking DLSS and DLSS-FG
