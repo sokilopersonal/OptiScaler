@@ -538,6 +538,18 @@ bool StreamlineHooks::hkdlssg_slOnPluginLoad(void* params, const char* loaderJSO
 
         if (configJson.contains("/external/feature/tags"_json_pointer))
             configJson["external"]["feature"]["tags"].clear(); // We handle the DLSSG resources
+
+        if (configJson.contains("/external/vk/device/queues/compute/count"_json_pointer))
+            configJson["external"]["vk"]["device"]["queues"]["compute"]["count"] = 0;
+
+        if (configJson.contains("/external/vk/device/queues/graphics/count"_json_pointer))
+            configJson["external"]["vk"]["device"]["queues"]["graphics"]["count"] = 0;
+
+        if (configJson.contains("/external/vk/device/1.2_features"_json_pointer))
+            configJson["external"]["vk"]["device"]["1.2_features"].clear();
+
+        if (configJson.contains("/external/vk/device/1.3_features"_json_pointer))
+            configJson["external"]["vk"]["device"]["1.3_features"].clear();
     }
 
     if (State::Instance().activeFgInput == FGInput::DLSSG || State::Instance().activeFgInput == FGInput::Nukems)
@@ -550,12 +562,6 @@ bool StreamlineHooks::hkdlssg_slOnPluginLoad(void* params, const char* loaderJSO
 
         if (configJson.contains("/external/vk/opticalflow/supported"_json_pointer))
             configJson["external"]["vk"]["opticalflow"]["supported"] = true;
-
-        if (configJson.contains("/external/vk/device/queues/compute/count"_json_pointer))
-            configJson["external"]["vk"]["device"]["queues"]["compute"]["count"] = 0;
-
-        if (configJson.contains("/external/vk/device/queues/graphics/count"_json_pointer))
-            configJson["external"]["vk"]["device"]["queues"]["graphics"]["count"] = 0;
     }
 
     if (Config::Instance()->VulkanExtensionSpoofing.value_or_default())
@@ -565,12 +571,6 @@ bool StreamlineHooks::hkdlssg_slOnPluginLoad(void* params, const char* loaderJSO
 
         if (configJson.contains("/external/vk/device/extensions"_json_pointer))
             configJson["external"]["vk"]["device"]["extensions"].clear();
-
-        if (configJson.contains("/external/vk/device/1.2_features"_json_pointer))
-            configJson["external"]["vk"]["device"]["1.2_features"].clear();
-
-        if (configJson.contains("/external/vk/device/1.3_features"_json_pointer))
-            configJson["external"]["vk"]["device"]["1.3_features"].clear();
     }
 
     config = configJson.dump();
