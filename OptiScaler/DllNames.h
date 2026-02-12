@@ -176,7 +176,7 @@ DEFINE_NAME_VECTORS(dx11, "d3d11");
 DEFINE_NAME_VECTORS(dx12, "d3d12");
 DEFINE_NAME_VECTORS(dx12agility, "d3d12core");
 DEFINE_NAME_VECTORS(dxgi, "dxgi");
-DEFINE_NAME_VECTORS(vk, "vulkan-1", "winevulkan");
+DEFINE_NAME_VECTORS(vk, "vulkan-1");
 
 DEFINE_NAME_VECTORS(nvngx, "nvngx", "_nvngx");
 DEFINE_NAME_VECTORS(nvngxDlss, "nvngx_dlss");

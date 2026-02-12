@@ -840,19 +840,20 @@ static void CheckWorkingMode()
             }
 
             // Vulkan
-            vulkanModule = GetDllNameWModule(&vkNamesW);
             if (State::Instance().isRunningOnDXVK || State::Instance().isRunningOnLinux ||
-                State::Instance().gameQuirks & GameQuirk::LoadVulkanManually)
+                (State::Instance().gameQuirks & GameQuirk::LoadVulkanManually))
             {
                 vulkanModule = NtdllProxy::LoadLibraryExW_Ldr(L"vulkan-1.dll", NULL, 0);
                 LOG_DEBUG("Loading vulkan-1.dll for Linux, result: {:X}", (size_t) vulkanModule);
             }
+            else
+            {
+                vulkanModule = GetDllNameWModule(&vkNamesW);
+            }
 
             if (vulkanModule != nullptr)
             {
-                if (!State::Instance().isRunningOnDXVK && !State::Instance().isRunningOnLinux)
-                    LOG_DEBUG("vulkan-1.dll already in memory");
-
+                LOG_DEBUG("Hooking vulkan-1.dll");
                 VulkanHooks::Hook(vulkanModule);
             }
 
@@ -1743,6 +1744,11 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         KernelBaseProxy::Init();
         Kernel32Proxy::Init();
 
+        // Check for Wine
+        spdlog::info("");
+        State::Instance().isRunningOnLinux = IsRunningOnWine();
+        State::Instance().isRunningOnDXVK = State::Instance().isRunningOnLinux;
+
         spdlog::info("");
         CheckQuirks();
 
@@ -1848,11 +1854,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         // Hook FSR4 stuff as early as possible
         spdlog::info("");
         InitFSR4Update();
-
-        // Check for Wine
-        spdlog::info("");
-        State::Instance().isRunningOnLinux = IsRunningOnWine();
-        State::Instance().isRunningOnDXVK = State::Instance().isRunningOnLinux;
 
         if (!Config::Instance()->OverrideNvapiDll.has_value())
         {

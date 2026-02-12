@@ -360,10 +360,6 @@ HMODULE LibraryLoadHooks::LoadLibraryCheckW(std::wstring libName, LPCWSTR lpLibF
 
         if (module != nullptr)
         {
-            // VulkanSpoofing::HookForVulkanSpoofing(module);
-            // VulkanSpoofing::HookForVulkanExtensionSpoofing(module);
-            // VulkanSpoofing::HookForVulkanVRAMSpoofing(module);
-
             VulkanHooks::Hook(module);
         }
 
