@@ -652,9 +652,7 @@ inline static VkResult hkvkEnumerateInstanceExtensionProperties(const char* pLay
     {
         if (pLayerName == nullptr && pProperties == nullptr && count == 0)
         {
-            LOG_TRACE("hkvkEnumerateDeviceExtensionProperties({0}) count: {1}", pLayerName,
-                      vkEnumerateDeviceExtensionPropertiesCount);
-
+            LOG_TRACE("hkvkEnumerateDeviceExtensionProperties count: {}", vkEnumerateDeviceExtensionPropertiesCount);
             return result;
         }
     }
