@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Reflex_Hooks.h"
 #include <Config.h>
+#include "../framegen/xefg/XeFG_Dx12.h"
 
 #include <nvapi/fakenvapi.h>
 
@@ -340,11 +341,13 @@ void ReflexHooks::update(bool optiFg_FgState, bool isVulkan)
     // But need to fallback in case a game stops sending them for some reason
     _updatesWithoutMarker++;
 
-    State::Instance().reflexShowWarning = false;
+    auto& state = State::Instance();
+
+    state.reflexShowWarning = false;
 
     if (_updatesWithoutMarker > 20 || !_inited)
     {
-        State::Instance().reflexLimitsFps = false;
+        state.reflexLimitsFps = false;
         return;
     }
 
@@ -352,36 +355,38 @@ void ReflexHooks::update(bool optiFg_FgState, bool isVulkan)
     {
         // optiFg_FgState doesn't matter for vulkan
         // isUsingFakenvapi() because fakenvapi might override the reflex' setting and we don't know it
-        State::Instance().reflexLimitsFps = fakenvapi::isUsingFakenvapi() || _lastVkSleepParams.bLowLatencyMode;
+        state.reflexLimitsFps = fakenvapi::isUsingFakenvapi() || _lastVkSleepParams.bLowLatencyMode;
     }
     else
     {
         // Don't use when: Real Reflex markers + OptiFG + Reflex disabled, causes huge input latency
-        State::Instance().reflexLimitsFps =
+        state.reflexLimitsFps =
             fakenvapi::isUsingFakenvapi() || !optiFg_FgState || _lastSleepParams.bLowLatencyMode;
-        State::Instance().reflexShowWarning = State::Instance().activeFgOutput != FGOutput::XeFG &&
+        state.reflexShowWarning = state.activeFgOutput != FGOutput::XeFG &&
                                               !fakenvapi::isUsingFakenvapi() && optiFg_FgState &&
                                               _lastSleepParams.bLowLatencyMode;
     }
 
     static float lastFps = 0;
-    static bool lastReflexLimitsFps = State::Instance().reflexLimitsFps;
+    static bool lastReflexLimitsFps = state.reflexLimitsFps;
 
     // Reset required when toggling Reflex
-    if (State::Instance().reflexLimitsFps != lastReflexLimitsFps)
+    if (state.reflexLimitsFps != lastReflexLimitsFps)
     {
-        lastReflexLimitsFps = State::Instance().reflexLimitsFps;
+        lastReflexLimitsFps = state.reflexLimitsFps;
         lastFps = 0;
         setFPSLimit(0);
     }
 
-    if (!State::Instance().reflexLimitsFps)
+    if (!state.reflexLimitsFps)
         return;
 
     float currentFps = Config::Instance()->FramerateLimit.value_or_default();
+    bool useXeLL = Config::Instance()->UseXeLLFrameLimit.value_or_default();
     static bool lastDlssgDetectedState = false;
+    auto mode = fakenvapi::getCurrentMode();
 
-    if (lastDlssgDetectedState != _dlssgDetected)
+    if (lastDlssgDetectedState != _dlssgDetected && mode != Mode::XeLL)
     {
         lastDlssgDetectedState = _dlssgDetected;
         setFPSLimit(currentFps);
@@ -392,13 +397,43 @@ void ReflexHooks::update(bool optiFg_FgState, bool isVulkan)
             LOG_DEBUG("DLSS FG no longer detected");
     }
 
-    if ((optiFg_FgState && State::Instance().activeFgOutput == FGOutput::FSRFG) ||
+    if ((optiFg_FgState && state.activeFgOutput == FGOutput::FSRFG) ||
         (_dlssgDetected && fakenvapi::isUsingFakenvapi()))
         currentFps /= 2;
 
+    if (state.useXeLLFrameLimiterChanged)
+    {
+        state.useXeLLFrameLimiterChanged = false;
+        if (useXeLL)
+        {
+            LOG_INFO("XELL ENABLED");
+            setFPSLimit(0);
+            XeFG_Dx12::setFPSLimit(currentFps);
+        }
+        else
+        {
+            LOG_INFO("XELL DISABLED");
+            setFPSLimit(currentFps);
+            XeFG_Dx12::setFPSLimit(0);
+        }
+    }
+
     if (currentFps != lastFps)
     {
-        setFPSLimit(currentFps);
+        bool useXeLL = Config::Instance()->UseXeLLFrameLimit.value_or_default();
+        if (useXeLL)
+        {
+            LOG_INFO("XELL ENABLED");
+            setFPSLimit(0);
+            XeFG_Dx12::setFPSLimit(currentFps);
+        }
+        else
+        {
+            LOG_INFO("XELL DISABLED");
+            setFPSLimit(currentFps);
+            XeFG_Dx12::setFPSLimit(0);
+        }
+            
         lastFps = currentFps;
     }
 }

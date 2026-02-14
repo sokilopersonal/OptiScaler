@@ -520,6 +520,9 @@ class Config
     // Framerate
     CustomOptional<float> FramerateLimit { 0.0f };
 
+    // XeLL
+    CustomOptional<bool> UseXeLLFrameLimit { true };
+
     // HDR
     CustomOptional<bool> ForceHDR { false };
     CustomOptional<bool> UseHDR10 { false };

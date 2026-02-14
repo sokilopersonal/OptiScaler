@@ -66,6 +66,7 @@ class XeFG_Dx12 : public virtual IFGFeature_Dx12
 
     void* FrameGenerationContext() override final;
     void* SwapchainContext() override final;
+    static void setFPSLimit(float fps);
 
     XeFG_Dx12() : IFGFeature_Dx12(), IFGFeature()
     {

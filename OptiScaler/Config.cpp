@@ -872,6 +872,8 @@ bool Config::SaveIni()
     {
         ini.SetValue("Framerate", "FramerateLimit",
                      GetFloatValue(Instance()->FramerateLimit.value_for_config()).c_str());
+        ini.SetValue("Framerate", "XeLLFrameLimiter", 
+            GetBoolValue(Instance()->UseXeLLFrameLimit.value_for_config()).c_str());
     }
 
     // Output Scaling

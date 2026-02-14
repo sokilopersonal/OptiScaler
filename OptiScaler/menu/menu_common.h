@@ -84,6 +84,9 @@ class MenuCommon
     // reflex
     inline static float _limitFps = std::numeric_limits<float>::infinity();
 
+    // xell
+    inline static bool _xellLimiter = true;
+
     // ffx
     inline static int _ffxUpscalerIndex = -1;
     inline static int _ffxFGIndex = -1;

@@ -4413,6 +4413,15 @@ bool MenuCommon::RenderMenu()
                     if (std::isinf(_limitFps))
                         _limitFps = config->FramerateLimit.value_or_default();
 
+                    bool useXellLimiter = config->UseXeLLFrameLimit.value_or_default();
+                    if (ImGui::Checkbox("Use XeLL Frame Limiter", &useXellLimiter))
+                    {
+                        config->UseXeLLFrameLimit = useXellLimiter;
+                        LOG_DEBUG("XeLL Frame Limiter set: {}", useXellLimiter);
+
+                        state.useXeLLFrameLimiterChanged = true;
+                    }
+
                     ImGui::SliderFloat("FPS Limit", &_limitFps, 0, 200, "%.0f");
 
                     if (ImGui::Button("Apply Limit"))

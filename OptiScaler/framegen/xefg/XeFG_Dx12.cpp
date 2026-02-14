@@ -73,7 +73,6 @@ bool XeFG_Dx12::CreateSwapchainContext(ID3D12Device* device)
             xell_sleep_params_t sleepParams = {};
             sleepParams.bLowLatencyMode = true;
             sleepParams.bLowLatencyBoost = false;
-            sleepParams.minimumIntervalUs = 0;
 
             auto xellResult = XeLLProxy::SetSleepMode()(XeLLProxy::Context(), &sleepParams);
             if (xellResult != XELL_RESULT_SUCCESS)
@@ -852,6 +851,23 @@ bool XeFG_Dx12::Dispatch()
 void* XeFG_Dx12::FrameGenerationContext() { return _fgContext; }
 
 void* XeFG_Dx12::SwapchainContext() { return _swapChainContext; }
+
+void XeFG_Dx12::setFPSLimit(float fps)
+{
+    LOG_INFO("Set XeLL FPS Limit to: {}", fps);
+
+    xell_sleep_params_t params {};
+    auto func = XeLLProxy::GetSleepMode();
+    if (func)
+    {
+        xell_result_t result = func(XeLLProxy::Context(), &params);
+        if (fps == 0.0)
+            params.minimumIntervalUs = 0;
+        else
+            params.minimumIntervalUs = static_cast<uint32_t>(std::round(1'000'000 / fps));
+        XeLLProxy::SetSleepMode()(XeLLProxy::Context(), &params);
+    }
+}
 
 XeFG_Dx12::~XeFG_Dx12() { Shutdown(); }
 
