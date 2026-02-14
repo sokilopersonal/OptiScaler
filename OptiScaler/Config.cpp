@@ -194,6 +194,7 @@ bool Config::Reload(std::filesystem::path iniPath)
         // Framerate
         {
             FramerateLimit.set_from_config(readFloat("Framerate", "FramerateLimit"));
+            UseXeLLFrameLimit.set_from_config(readBool("Framerate", "XeLLFrameLimiter"));
         }
 
         // FSR Common

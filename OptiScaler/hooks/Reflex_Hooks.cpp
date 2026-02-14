@@ -384,9 +384,8 @@ void ReflexHooks::update(bool optiFg_FgState, bool isVulkan)
     float currentFps = Config::Instance()->FramerateLimit.value_or_default();
     bool useXeLL = Config::Instance()->UseXeLLFrameLimit.value_or_default();
     static bool lastDlssgDetectedState = false;
-    auto mode = fakenvapi::getCurrentMode();
 
-    if (lastDlssgDetectedState != _dlssgDetected && mode != Mode::XeLL)
+    if (lastDlssgDetectedState != _dlssgDetected)
     {
         lastDlssgDetectedState = _dlssgDetected;
         setFPSLimit(currentFps);
@@ -401,37 +400,22 @@ void ReflexHooks::update(bool optiFg_FgState, bool isVulkan)
         (_dlssgDetected && fakenvapi::isUsingFakenvapi()))
         currentFps /= 2;
 
-    if (state.useXeLLFrameLimiterChanged)
+    if (currentFps != lastFps || state.useXeLLFrameLimiterChanged)
     {
-        state.useXeLLFrameLimiterChanged = false;
-        if (useXeLL)
+        if (state.useXeLLFrameLimiterChanged)
         {
-            LOG_INFO("XELL ENABLED");
-            setFPSLimit(0);
-            XeFG_Dx12::setFPSLimit(currentFps);
+            state.useXeLLFrameLimiterChanged = false;
         }
-        else
-        {
-            LOG_INFO("XELL DISABLED");
-            setFPSLimit(currentFps);
-            XeFG_Dx12::setFPSLimit(0);
-        }
-    }
 
-    if (currentFps != lastFps)
-    {
-        bool useXeLL = Config::Instance()->UseXeLLFrameLimit.value_or_default();
         if (useXeLL)
         {
-            LOG_INFO("XELL ENABLED");
             setFPSLimit(0);
             XeFG_Dx12::setFPSLimit(currentFps);
         }
         else
         {
-            LOG_INFO("XELL DISABLED");
-            setFPSLimit(currentFps);
             XeFG_Dx12::setFPSLimit(0);
+            setFPSLimit(currentFps);
         }
             
         lastFps = currentFps;
