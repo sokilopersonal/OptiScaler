@@ -56,6 +56,9 @@
 #include <d3d12sdklayers.h>
 #endif
 
+// Use vkQueueSubmit2KHR instead of vkQueueSubmit for testing Linux issue
+// #define USE_QUEUE_SUBMIT_2_KHR
+
 inline HMODULE dllModule = nullptr;
 inline HMODULE exeModule = nullptr;
 inline HMODULE originalModule = nullptr;

@@ -522,6 +522,16 @@ VkResult VulkanSpoofing::hkvkCreateDevice(VkPhysicalDevice physicalDevice, VkDev
         newExtensionList.push_back(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
     }
 
+#ifdef USE_QUEUE_SUBMIT_2_KHR
+    LOG_INFO("Adding QueueSubmit2 Vulkan extensions");
+    if (vkDeviceExtensions.size() == 0 ||
+        vkDeviceExtensions.contains(std::string(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)))
+    {
+        LOG_DEBUG("  Adding {}", VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+        newExtensionList.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    }
+#endif
+
     pCreateInfo->enabledExtensionCount = static_cast<uint32_t>(newExtensionList.size());
     pCreateInfo->ppEnabledExtensionNames = newExtensionList.data();
 
