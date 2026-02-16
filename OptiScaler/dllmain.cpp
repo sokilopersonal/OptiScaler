@@ -1760,13 +1760,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         State::Instance().isRunningOnLinux = IsRunningOnWine();
         State::Instance().isRunningOnDXVK = State::Instance().isRunningOnLinux;
 
-        spdlog::info("");
-        CheckQuirks();
-
-        // Check for working mode and attach hooks
-        spdlog::info("");
-        CheckWorkingMode();
-
         // Check if real DLSS available
         if (Config::Instance()->DLSSEnabled.value_or_default())
         {
@@ -1814,6 +1807,13 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
             spdlog::info("Not running on Nvidia, disabling DLSS");
             Config::Instance()->DLSSEnabled.set_volatile_value(false);
         }
+
+        spdlog::info("");
+        CheckQuirks();
+
+        // Check for working mode and attach hooks
+        spdlog::info("");
+        CheckWorkingMode();
 
         // OptiFG & Overlay Checks
         // TODO: Either FGInput == FGInput::Upscaler or FGOutput == FGOutput::FSRFG
