@@ -1048,7 +1048,7 @@ ffxReturnCode_t ffxDispatch_Dx12FG(ffxContext* context, ffxDispatchDescHeader* d
     else if (desc->type == FFX_API_DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE_V2)
     {
         auto cdDesc = (ffxDispatchDescFrameGenerationPrepareV2*) desc;
-        LOG_DEBUG("DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE, frameID: {}", cdDesc->frameID);
+        LOG_DEBUG("DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE_V2, frameID: {}", cdDesc->frameID);
 
         CheckForFrame(fg, cdDesc->frameID);
         auto fIndex = IndexForFrameId(cdDesc->frameID);
