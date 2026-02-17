@@ -143,6 +143,9 @@ static std::string FfxGetGetDescTypeName(ffxStructType_t type)
     case 0x0002000bu:
         return std::format("QUERY_DESC_TYPE_FRAMEGENERATION_GPU_MEMORY_USAGE_V2 ({:X})", type);
 
+    case 0x0002000cu:
+        return std::format("DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE_V2 ({:X})", type);
+
     case 0x30001u:
         return std::format("CREATE_CONTEXT_DESC_TYPE_FRAMEGENERATIONSWAPCHAIN_WRAP_DX12 ({:X})", type);
 

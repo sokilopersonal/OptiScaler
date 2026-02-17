@@ -683,16 +683,40 @@
     <ClInclude Include="shaders\resource_copy\precompile\rc_Shader_Vk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="hooks\VulkanwDx12\VulkanwDx12_Hooks.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="hooks\VulkanwDx12\CommandBuffer_StateTracker.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="shaders\depth_transfer\precompile\dt_int_Shader_Vk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="upscalers\fsr2_212\FSR2Feature_VkOnDx12_212.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hooks\CommandBuffer_StateTracker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hooks\VulkanwDx12_Hooks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shaders\hud_copy\HudCopy_Common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shaders\hud_copy\HudCopy_Dx12.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shaders\hud_copy\precompile\HudCopy_Shader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shaders\output_scaling\precompile\bcds_bicubic_Shader_Vk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shaders\output_scaling\precompile\bcds_catmull_Shader_Vk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shaders\output_scaling\precompile\bcds_lanczos_Shader_Vk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shaders\output_scaling\precompile\bcds_magc_Shader_Vk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shaders\output_scaling\precompile\bcus_Shader_Vk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -1088,10 +1112,13 @@
     <ClCompile Include="shaders\resource_copy\RC_Vk.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="hooks\VulkanwDx12\VulkanwDx12_Hooks.cpp">
+    <ClCompile Include="upscalers\fsr2_212\FSR2Feature_VkOnDx12_212.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="upscalers\fsr2_212\FSR2Feature_VkOnDx12_212.cpp">
+    <ClCompile Include="hooks\VulkanwDx12_Hooks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="shaders\hud_copy\HudCopy_Dx12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

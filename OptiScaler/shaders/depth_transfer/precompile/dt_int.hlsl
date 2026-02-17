@@ -1,17 +1,20 @@
 #ifdef VK_MODE
 [[vk::binding(0, 0)]]
 #endif
-RWTexture2D<uint> SourceTexture : register(u0);
+Texture2D<uint> SrcU32 : register(t0);
 
 #ifdef VK_MODE
 [[vk::binding(1, 0)]]
 #endif
-RWTexture2D<float> DestinationTexture : register(u1);
+RWTexture2D<float> OutTex : register(u1);
 
-// Shader to perform the conversion
 [numthreads(16, 16, 1)]
-void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void CSMain(uint3 tid : SV_DispatchThreadID)
 {
-    uint srcColor = SourceTexture[dispatchThreadID.xy];
-    DestinationTexture[dispatchThreadID.xy] = float(srcColor) / 131071.0f;
+    uint2 p = tid.xy;
+
+    uint v = SrcU32.Load(int3(p, 0));
+
+    // Your mapping; keep it explicit
+    OutTex[p] = float(v) * (1.0f / 16777215.0f);
 }

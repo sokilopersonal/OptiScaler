@@ -10,6 +10,36 @@
 #include "ffx_framegeneration.h"
 #include "dx12/ffx_api_dx12.h"
 
+#define FFX_API_DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE_V2 0x2000C
+struct ffxDispatchDescFrameGenerationPrepareV2
+{
+    ffxDispatchDescHeader header;
+    uint64_t frameID; ///< Identifier used to select internal resources when async support is enabled. Must increment by
+                      ///< exactly one (1) for each frame. Any non-exactly-one difference will reset the frame
+                      ///< generation logic.
+    uint32_t flags;   ///< Zero or combination of values from FfxApiDispatchFrameGenerationFlags.
+    void* commandList;                            ///< A command list to record frame generation commands into.
+    struct FfxApiDimensions2D renderSize;         ///< The dimensions used to render game content, dilatedDepth,
+                                                  ///< dilatedMotionVectors are expected to be of ths size.
+    struct FfxApiFloatCoords2D jitterOffset;      ///< The subpixel jitter offset applied to the camera.
+    struct FfxApiFloatCoords2D motionVectorScale; ///< The scale factor to apply to motion vectors.
+
+    float frameTimeDelta; ///< Time elapsed in milliseconds since the last frame.
+    bool reset; ///< A boolean value which when set to true, indicates FrameGeneration will be called in reset mode
+    float cameraNear; ///< The distance to the near plane of the camera.
+    float cameraFar;  ///< The distance to the far plane of the camera. This is used only used in case of non infinite
+                      ///< depth.
+    float cameraFovAngleVertical;  ///< The camera angle field of view in the vertical direction (expressed in radians).
+    float viewSpaceToMetersFactor; ///< The scale factor to convert view space units to meters
+    struct FfxApiResource depth;   ///< The depth buffer data
+    struct FfxApiResource motionVectors; ///< The motion vector data
+
+    float cameraPosition[3]; ///< The camera position in world space
+    float cameraUp[3];       ///< The camera up normalized vector in world space
+    float cameraRight[3];    ///< The camera right normalized vector in world space
+    float cameraForward[3];  ///< The camera forward normalized vector in world space
+};
+
 static ID3D12Device* _device = nullptr;
 static FG_Constants _fgConst {};
 
@@ -957,6 +987,98 @@ ffxReturnCode_t ffxDispatch_Dx12FG(ffxContext* context, ffxDispatchDescHeader* d
         fg->SetJitter(cdDesc->jitterOffset.x, cdDesc->jitterOffset.y, fIndex);
         fg->SetMVScale(cdDesc->motionVectorScale.x, cdDesc->motionVectorScale.y, fIndex);
         fg->SetReset(cdDesc->unused_reset ? 1 : 0, fIndex);
+
+        if (cdDesc->depth.resource != nullptr)
+        {
+            Dx12Resource depth {};
+            depth.cmdList = (ID3D12GraphicsCommandList*) cdDesc->commandList;
+            depth.height = cdDesc->renderSize.height; // cdDesc->depth.description.width;
+            depth.resource = (ID3D12Resource*) cdDesc->depth.resource;
+            depth.state = GetD3D12State((FfxApiResourceState) cdDesc->depth.state);
+            depth.type = FG_ResourceType::Depth;
+
+            if (Config::Instance()->FGDepthValidNow.value_or_default())
+                depth.validity = FG_ResourceValidity::ValidNow;
+            else
+                depth.validity = FG_ResourceValidity::JustTrackCmdlist;
+
+            depth.width = cdDesc->renderSize.width; // cdDesc->depth.description.height;
+            depth.frameIndex = fIndex;
+
+            fg->SetResource(&depth);
+        }
+
+        if (cdDesc->motionVectors.resource != nullptr)
+        {
+            uint32_t width = 0;
+            uint32_t height = 0;
+
+            if (_fgConst.flags & FG_Flags::DisplayResolutionMVs)
+            {
+                width = _fgConst.displayWidth;
+                height = _fgConst.displayHeight;
+            }
+            else
+            {
+                width = cdDesc->renderSize.width;
+                height = cdDesc->renderSize.height;
+            }
+
+            Dx12Resource velocity {};
+            velocity.cmdList = (ID3D12GraphicsCommandList*) cdDesc->commandList;
+            velocity.height = height; // cdDesc->motionVectors.description.width;
+            velocity.resource = (ID3D12Resource*) cdDesc->motionVectors.resource;
+            velocity.state = GetD3D12State((FfxApiResourceState) cdDesc->motionVectors.state);
+            velocity.type = FG_ResourceType::Velocity;
+
+            if (Config::Instance()->FGVelocityValidNow.value_or_default())
+                velocity.validity = FG_ResourceValidity::ValidNow;
+            else
+                velocity.validity = FG_ResourceValidity::JustTrackCmdlist;
+
+            velocity.width = width; // cdDesc->motionVectors.description.height;
+            velocity.frameIndex = fIndex;
+
+            fg->SetResource(&velocity);
+        }
+
+        LOG_DEBUG("DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE done");
+        return FFX_API_RETURN_OK;
+    }
+    else if (desc->type == FFX_API_DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE_V2)
+    {
+        auto cdDesc = (ffxDispatchDescFrameGenerationPrepareV2*) desc;
+        LOG_DEBUG("DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE_V2, frameID: {}", cdDesc->frameID);
+
+        CheckForFrame(fg, cdDesc->frameID);
+        auto fIndex = IndexForFrameId(cdDesc->frameID);
+
+        auto device = _device == nullptr ? s.currentD3D12Device : _device;
+        fg->EvaluateState(device, _fgConst);
+
+        if (!fg->IsActive() || fg->IsPaused())
+            return FFX_API_RETURN_OK;
+
+        //  Camera Data
+        bool cameraDataFound = true;
+
+        fg->SetCameraData(cdDesc->cameraPosition, cdDesc->cameraUp, cdDesc->cameraRight, cdDesc->cameraForward, fIndex);
+
+        cameraDataFound = true;
+
+        // Camera Values
+        UINT64 dispWidth = 0;
+        UINT dispHeight = 0;
+        fg->GetInterpolationRect(dispWidth, dispHeight, fIndex);
+        auto aspectRatio = (float) dispWidth / (float) dispHeight;
+        fg->SetCameraValues(cdDesc->cameraNear, cdDesc->cameraFar, cdDesc->cameraFovAngleVertical, aspectRatio, 0.0f,
+                            fIndex);
+
+        // Other values
+        fg->SetFrameTimeDelta(cdDesc->frameTimeDelta, fIndex);
+        fg->SetJitter(cdDesc->jitterOffset.x, cdDesc->jitterOffset.y, fIndex);
+        fg->SetMVScale(cdDesc->motionVectorScale.x, cdDesc->motionVectorScale.y, fIndex);
+        fg->SetReset(cdDesc->reset ? 1 : 0, fIndex);
 
         if (cdDesc->depth.resource != nullptr)
         {

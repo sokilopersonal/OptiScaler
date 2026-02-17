@@ -6086,6 +6086,386 @@ void Vulkan_wDx12::hk_vkCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32
     o_vkCmdExecuteCommands(cmdBuffer, commandBufferCount, pCommandBuffers);
 }
 
+#ifdef USE_QUEUE_SUBMIT_2_KHR
+VkResult Vulkan_wDx12::hk_vkQueueSubmit(VkQueue queue, uint32_t submitCount, VkSubmitInfo* pSubmits, VkFence fence)
+{
+    if (pSubmits == nullptr || o_vkQueueSubmit == nullptr || o_vkQueueSubmit2KHR == nullptr)
+    {
+        LOG_ERROR("Invalid parameters to hk_vkQueueSubmit");
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+#ifdef LOG_ALL_RECORDS
+    LOG_DEBUG("queue: {:X}, submitCount: {}, fence: {:X}", (size_t) queue, submitCount, (size_t) fence);
+#endif
+
+    std::vector<VkSemaphore> semaphores;
+    std::vector<VkSubmitInfo> submitInfos;
+    std::vector<uint64_t> signalValues;
+    std::vector<VkCommandBuffer> cmdBuffers;
+    bool injected = false;
+
+    if (commandBufferFoundCount < 1 && lastCmdBuffer != VK_NULL_HANDLE && submitCount > 0)
+    {
+        for (uint32_t i = 0; i < submitCount; i++)
+        {
+            bool addSemaphore = false;
+            uint32_t submitIndex = 0;
+
+            if (pSubmits[i].commandBufferCount > 0)
+            {
+                for (uint32_t j = 0; j < pSubmits[i].commandBufferCount; j++)
+                {
+                    if (pSubmits[i].pCommandBuffers[j] == lastCmdBuffer)
+                    {
+                        LOG_DEBUG("Found upscaling command buffer: {:X}, submit: {}, queue: {:X}",
+                                  (size_t) lastCmdBuffer, i, (size_t) queue);
+
+                        // Upscaling command buffer found, inject timeline semaphore
+                        commandBufferFoundCount++;
+                        submitIndex = i;
+
+                        if (commandBufferFoundCount == 1)
+                        {
+                            addSemaphore = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (addSemaphore)
+            {
+                // Original signals in submit
+                auto signalCount = pSubmits[submitIndex].signalSemaphoreCount;
+                auto signals = pSubmits[submitIndex].pSignalSemaphores;
+                bool allFound = false;
+                VkDummyProps* lastNode = nullptr;
+
+                VkDummyProps* next = (VkDummyProps*) &pSubmits[submitIndex];
+                lastNode = next;
+
+                // collect all signal semaphore submit infos
+                while (next->pNext != nullptr)
+                {
+                    next = (VkDummyProps*) next->pNext;
+
+                    if (next->sType == VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO)
+                    {
+                        auto tlSemaphoreInfo = (VkTimelineSemaphoreSubmitInfo*) next;
+
+                        if (tlSemaphoreInfo->signalSemaphoreValueCount > 0)
+                        {
+                            // Store signal values
+                            for (size_t a = 0; a < tlSemaphoreInfo->signalSemaphoreValueCount; a++)
+                            {
+                                signalValues.push_back(tlSemaphoreInfo->pSignalSemaphoreValues[a]);
+                            }
+
+                            if (tlSemaphoreInfo->waitSemaphoreValueCount > 0)
+                            {
+                                // only removing signal info
+                                LOG_DEBUG("Clear signals from timeline semaphore submit info");
+                                tlSemaphoreInfo->signalSemaphoreValueCount = 0;
+                                tlSemaphoreInfo->pSignalSemaphoreValues = nullptr;
+                            }
+                            else if (lastNode != nullptr && lastNode->pNext == next)
+                            {
+                                // removing this signal info so update previous nodes pNext
+                                LOG_DEBUG("Remove timeline semaphore submit info");
+                                lastNode->pNext = next->pNext;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        lastNode = next;
+                    }
+                }
+
+                // insert out signal info structure after lastNode
+                if (lastNode != nullptr)
+                    lastNode->pNext = &timelineInfoResourceCopy;
+
+                LOG_DEBUG("Original submit command buffer count: {}", pSubmits[submitIndex].commandBufferCount);
+
+                // Find upscaler command buffer and move all after it to dummy submit
+                cmdBuffers.push_back(syncSubmitInfo.pCommandBuffers[0]); // Barrier command buffer
+
+                bool bufferFound = false;
+                uint32_t newCommandCount = pSubmits[submitIndex].commandBufferCount;
+                for (uint32_t b = 0; b < pSubmits[submitIndex].commandBufferCount; b++)
+                {
+                    if (bufferFound)
+                        cmdBuffers.push_back(pSubmits[submitIndex].pCommandBuffers[b]);
+
+                    if (!bufferFound && pSubmits[submitIndex].pCommandBuffers[b] == lastCmdBuffer)
+                    {
+                        newCommandCount = b + 1;
+                        bufferFound = true;
+                    }
+                }
+
+                // Remove moved command buffers from original submit
+                pSubmits[submitIndex].commandBufferCount = newCommandCount;
+
+                LOG_DEBUG("Moved {} command buffers to new submit", cmdBuffers.size() - 1);
+                LOG_DEBUG("Original submit command buffer count: {}", pSubmits[submitIndex].commandBufferCount);
+
+                // now inserting our signal to it
+                pSubmits[submitIndex].signalSemaphoreCount = resourceCopySubmitInfo.signalSemaphoreCount;
+                pSubmits[submitIndex].pSignalSemaphores = resourceCopySubmitInfo.pSignalSemaphores;
+                timelineInfoResourceCopy.waitSemaphoreValueCount = pSubmits[submitIndex].waitSemaphoreCount;
+
+                // Inject signal semaphore info to out submit info
+                syncSubmitInfo.commandBufferCount = static_cast<uint32_t>(cmdBuffers.size());
+                syncSubmitInfo.pCommandBuffers = cmdBuffers.data();
+
+                // move signal semaphores to new submit
+                syncSubmitInfo.signalSemaphoreCount = signalCount;
+                syncSubmitInfo.pSignalSemaphores = signals;
+
+                // move signal values to new submit
+                if (signalValues.size() > 0)
+                {
+                    syncTimelineInfo.signalSemaphoreValueCount =
+                        static_cast<uint32_t>(signalValues.size()) + signalCount;
+                    syncTimelineInfo.pSignalSemaphoreValues = signalValues.data();
+                }
+                else
+                {
+                    syncTimelineInfo.signalSemaphoreValueCount = signalCount;
+                    syncTimelineInfo.pSignalSemaphoreValues = nullptr;
+                }
+
+                // prepare new submit infos list
+                submitInfos.reserve(submitCount + 2);
+
+                // copyback old submit infos
+                for (uint32_t n = 0; n < submitCount; n++)
+                {
+                    submitInfos.push_back(pSubmits[n]);
+
+                    // add our submit info
+                    if (n == submitIndex)
+                    {
+                        submitInfos.push_back(copyBackSubmitInfo);
+                        submitInfos.push_back(syncSubmitInfo);
+                    }
+                }
+
+                // update submit infos
+                submitCount = static_cast<uint32_t>(submitInfos.size());
+                pSubmits = submitInfos.data();
+
+                LOG_DEBUG("Injected w/Dx12 submits");
+                lastCmdBuffer = VK_NULL_HANDLE;
+                injected = true;
+                break;
+            }
+        }
+    }
+
+    // Convert VkSubmitInfo to VkSubmitInfo2 and call o_vkQueueSubmit2
+    std::vector<VkSubmitInfo2> submitInfos2;
+    std::vector<std::vector<VkSemaphoreSubmitInfo>> waitSemaphoreInfos;
+    std::vector<std::vector<VkSemaphoreSubmitInfo>> signalSemaphoreInfos;
+    std::vector<std::vector<VkCommandBufferSubmitInfo>> commandBufferInfos;
+
+    submitInfos2.reserve(submitCount);
+    waitSemaphoreInfos.reserve(submitCount);
+    signalSemaphoreInfos.reserve(submitCount);
+    commandBufferInfos.reserve(submitCount);
+
+    for (uint32_t i = 0; i < submitCount; i++)
+    {
+        VkSubmitInfo2 submitInfo2 = {};
+        submitInfo2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo2.pNext = nullptr; // Don't copy pNext - timeline info will be embedded in semaphore infos
+        submitInfo2.flags = 0;
+
+        // Extract timeline semaphore values from pNext chain
+        const VkTimelineSemaphoreSubmitInfo* timelineInfo = nullptr;
+        const void* pNext = pSubmits[i].pNext;
+        while (pNext != nullptr)
+        {
+            const VkDummyProps* props = static_cast<const VkDummyProps*>(pNext);
+            if (props->sType == VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO)
+            {
+                timelineInfo = static_cast<const VkTimelineSemaphoreSubmitInfo*>(pNext);
+                break;
+            }
+            pNext = props->pNext;
+        }
+
+        // Convert wait semaphores
+        std::vector<VkSemaphoreSubmitInfo> waitInfos;
+        waitInfos.reserve(pSubmits[i].waitSemaphoreCount);
+        for (uint32_t j = 0; j < pSubmits[i].waitSemaphoreCount; j++)
+        {
+            VkSemaphoreSubmitInfo waitInfo = {};
+            waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            waitInfo.semaphore = pSubmits[i].pWaitSemaphores[j];
+
+            // Get timeline value if available
+            if (timelineInfo && j < timelineInfo->waitSemaphoreValueCount && timelineInfo->pWaitSemaphoreValues)
+            {
+                waitInfo.value = timelineInfo->pWaitSemaphoreValues[j];
+            }
+            else
+            {
+                waitInfo.value = 0; // Binary semaphore
+            }
+
+            // Convert VkPipelineStageFlags to VkPipelineStageFlags2
+            VkPipelineStageFlags stageMask =
+                pSubmits[i].pWaitDstStageMask ? pSubmits[i].pWaitDstStageMask[j] : VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+            // Map VkPipelineStageFlags to VkPipelineStageFlags2
+            if (stageMask == VK_PIPELINE_STAGE_ALL_COMMANDS_BIT)
+                waitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            else if (stageMask == VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT)
+                waitInfo.stageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+            else if (stageMask == VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT)
+                waitInfo.stageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+            else
+                waitInfo.stageMask = static_cast<VkPipelineStageFlags2>(stageMask);
+
+            waitInfo.deviceIndex = 0;
+            waitInfos.push_back(waitInfo);
+        }
+        waitSemaphoreInfos.push_back(std::move(waitInfos));
+
+        // Convert command buffers
+        std::vector<VkCommandBufferSubmitInfo> cmdInfos;
+        cmdInfos.reserve(pSubmits[i].commandBufferCount);
+        for (uint32_t j = 0; j < pSubmits[i].commandBufferCount; j++)
+        {
+            VkCommandBufferSubmitInfo cmdInfo = {};
+            cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+            cmdInfo.commandBuffer = pSubmits[i].pCommandBuffers[j];
+            cmdInfo.deviceMask = 0;
+            cmdInfos.push_back(cmdInfo);
+        }
+        commandBufferInfos.push_back(std::move(cmdInfos));
+
+        // Convert signal semaphores
+        std::vector<VkSemaphoreSubmitInfo> signalInfos;
+        signalInfos.reserve(pSubmits[i].signalSemaphoreCount);
+        for (uint32_t j = 0; j < pSubmits[i].signalSemaphoreCount; j++)
+        {
+            VkSemaphoreSubmitInfo signalInfo = {};
+            signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signalInfo.semaphore = pSubmits[i].pSignalSemaphores[j];
+
+            // Get timeline value if available
+            if (timelineInfo && j < timelineInfo->signalSemaphoreValueCount && timelineInfo->pSignalSemaphoreValues)
+            {
+                signalInfo.value = timelineInfo->pSignalSemaphoreValues[j];
+            }
+            else
+            {
+                signalInfo.value = 0; // Binary semaphore
+            }
+
+            signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            signalInfo.deviceIndex = 0;
+            signalInfos.push_back(signalInfo);
+        }
+        signalSemaphoreInfos.push_back(std::move(signalInfos));
+
+        // Set pointers in VkSubmitInfo2
+        submitInfo2.waitSemaphoreInfoCount = static_cast<uint32_t>(waitSemaphoreInfos[i].size());
+        submitInfo2.pWaitSemaphoreInfos = waitSemaphoreInfos[i].empty() ? nullptr : waitSemaphoreInfos[i].data();
+        submitInfo2.commandBufferInfoCount = static_cast<uint32_t>(commandBufferInfos[i].size());
+        submitInfo2.pCommandBufferInfos = commandBufferInfos[i].empty() ? nullptr : commandBufferInfos[i].data();
+        submitInfo2.signalSemaphoreInfoCount = static_cast<uint32_t>(signalSemaphoreInfos[i].size());
+        submitInfo2.pSignalSemaphoreInfos = signalSemaphoreInfos[i].empty() ? nullptr : signalSemaphoreInfos[i].data();
+
+        submitInfos2.push_back(submitInfo2);
+    }
+
+    // Call original function using VkSubmitInfo2
+    if (injected)
+        LOG_DEBUG("Submitting {} submits with vkQueueSubmit2KHR", submitCount);
+
+    auto result = o_vkQueueSubmit2KHR(queue, submitCount, submitInfos2.data(), fence);
+
+    if (injected)
+        LOG_DEBUG("Submitted {} submits with vkQueueSubmit2KHR", submitCount);
+
+    if (result != VK_SUCCESS)
+    {
+        LOG_ERROR("vkQueueSubmit2 failed with error code: {}", magic_enum::enum_name(result));
+
+        if (injected)
+        {
+            LOG_DEBUG("==================================================");
+
+            for (size_t a = 0; a < submitCount; a++)
+            {
+                LOG_DEBUG("  sType: {}", magic_enum::enum_name(pSubmits[a].sType));
+                LOG_DEBUG("  Submit[{}]: cmdBufferCount: {}", a, pSubmits[a].commandBufferCount);
+
+                for (size_t b = 0; b < pSubmits[a].commandBufferCount; b++)
+                {
+                    LOG_DEBUG("    CmdBuffer[{}]: {:X}", b, (size_t) pSubmits[a].pCommandBuffers[b]);
+                }
+                LOG_DEBUG("    waitSemaphoreCount: {}", pSubmits[a].waitSemaphoreCount);
+                for (size_t c = 0; c < pSubmits[a].waitSemaphoreCount; c++)
+                {
+                    LOG_DEBUG("    WaitSemaphore[{}]: {:X}", c, (size_t) pSubmits[a].pWaitSemaphores[c]);
+                }
+                LOG_DEBUG("    signalSemaphoreCount: {}", pSubmits[a].signalSemaphoreCount);
+                for (size_t d = 0; d < pSubmits[a].signalSemaphoreCount; d++)
+                {
+                    LOG_DEBUG("    SignalSemaphore[{}]: {:X}", d, (size_t) pSubmits[a].pSignalSemaphores[d]);
+                }
+
+                LOG_DEBUG("    pNext chain:");
+                VkDummyProps* next = (VkDummyProps*) &pSubmits[a];
+                while (next->pNext != nullptr)
+                {
+                    next = (VkDummyProps*) next->pNext;
+
+                    if (next->sType == VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO)
+                    {
+                        LOG_DEBUG("      sType: VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO");
+                        auto tlSemaphoreInfo = (VkTimelineSemaphoreSubmitInfo*) next;
+                        LOG_DEBUG("        waitSemaphoreValueCount: {}", tlSemaphoreInfo->waitSemaphoreValueCount);
+
+                        if (tlSemaphoreInfo->pWaitSemaphoreValues != nullptr)
+                        {
+                            for (size_t e = 0; e < tlSemaphoreInfo->waitSemaphoreValueCount; e++)
+                            {
+                                LOG_DEBUG("          WaitSemaphoreValue[{}]: {}", e,
+                                          tlSemaphoreInfo->pWaitSemaphoreValues[e]);
+                            }
+                        }
+
+                        LOG_DEBUG("        signalSemaphoreValueCount: {}", tlSemaphoreInfo->signalSemaphoreValueCount);
+
+                        if (tlSemaphoreInfo->pSignalSemaphoreValues != nullptr)
+                        {
+                            for (size_t f = 0; f < tlSemaphoreInfo->signalSemaphoreValueCount; f++)
+                            {
+                                LOG_DEBUG("          SignalSemaphoreValue[{}]: {}", f,
+                                          tlSemaphoreInfo->pSignalSemaphoreValues[f]);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        LOG_DEBUG("      sType: {}", (UINT) next->sType);
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
+}
+#else
 VkResult Vulkan_wDx12::hk_vkQueueSubmit(VkQueue queue, uint32_t submitCount, VkSubmitInfo* pSubmits, VkFence fence)
 {
     if (pSubmits == nullptr || o_vkQueueSubmit == nullptr)
@@ -6338,6 +6718,7 @@ VkResult Vulkan_wDx12::hk_vkQueueSubmit(VkQueue queue, uint32_t submitCount, VkS
 
     return result;
 }
+#endif
 
 VkResult Vulkan_wDx12::hk_vkQueueSubmit2(VkQueue queue, uint32_t submitCount, VkSubmitInfo2* pSubmits, VkFence fence)
 {

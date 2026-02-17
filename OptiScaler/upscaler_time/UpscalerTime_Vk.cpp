@@ -22,6 +22,7 @@ void UpscalerTimeVk::UpscaleStart(VkCommandBuffer cmdBuffer)
     if (_queryPool == VK_NULL_HANDLE)
         return;
 
+    vkCmdResetQueryPool(cmdBuffer, _queryPool, 0, 2);
     vkCmdWriteTimestamp(cmdBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, _queryPool, 0);
 }
 

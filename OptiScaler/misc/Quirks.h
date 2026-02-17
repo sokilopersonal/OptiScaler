@@ -37,6 +37,7 @@ enum class GameQuirk : uint64_t
     SetVelocityValidNow,
     SetHudlessValidNow,
     DisableResizeSkip,
+    SpoofRegistry,
 
     // Quirks that are applied deeper in code
     CyberpunkHudlessFixes,
@@ -196,6 +197,10 @@ static const QuirkEntry quirkTable[] = {
     // Requires Prey Luma Remastered mod for upscalers
     QUIRK_ENTRY("prey.exe", GameQuirk::DontUseNTShared, GameQuirk::DisableOptiXessPipelineCreation,
                 GameQuirk::DisableDxgiSpoofing),
+
+    // Black Myth: Wukong
+    // To enable DLSS-FG option
+    QUIRK_ENTRY_UE(b1, GameQuirk::SpoofRegistry),
 
     // Avowed
     // NoBarriers needed to avoid post-loading crash with DLSS

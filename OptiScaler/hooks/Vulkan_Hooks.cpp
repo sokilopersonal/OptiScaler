@@ -48,6 +48,7 @@ static VkResult hkvkCreateDevice(VkPhysicalDevice physicalDevice, VkDeviceCreate
 static VkResult hkvkQueuePresentKHR(VkQueue queue, VkPresentInfoKHR* pPresentInfo);
 static VkResult hkvkCreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo,
                                        VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain);
+static PFN_vkVoidFunction hkvkGetDeviceProcAddr(VkDevice device, const char* pName);
 
 static void HookDevice(VkDevice InDevice)
 {
@@ -223,6 +224,11 @@ static VkResult hkvkCreateDevice(VkPhysicalDevice physicalDevice, VkDeviceCreate
         if (szName.size() > 0)
             State::Instance().DeviceAdapterNames[*pDevice] = szName;
     }
+
+#ifdef USE_QUEUE_SUBMIT_2_KHR
+    if (result == VK_SUCCESS)
+        hkvkGetDeviceProcAddr(*pDevice, "vkQueueSubmit2KHR");
+#endif
 
     LOG_FUNC_RESULT(result);
 

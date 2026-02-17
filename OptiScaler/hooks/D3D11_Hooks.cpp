@@ -454,6 +454,8 @@ static HRESULT hkCreateSamplerState(ID3D11Device* This, const D3D11_SAMPLER_DESC
                 newDesc.MipLODBias = newDesc.MipLODBias * Config::Instance()->MipmapBiasOverride.value();
             else
                 newDesc.MipLODBias = newDesc.MipLODBias + Config::Instance()->MipmapBiasOverride.value();
+
+            newDesc.MipLODBias = std::clamp(newDesc.MipLODBias, -16.0f, 15.99f);
         }
 
         if (State::Instance().lastMipBiasMax < newDesc.MipLODBias)
@@ -462,8 +464,6 @@ static HRESULT hkCreateSamplerState(ID3D11Device* This, const D3D11_SAMPLER_DESC
         if (State::Instance().lastMipBias > newDesc.MipLODBias)
             State::Instance().lastMipBias = newDesc.MipLODBias;
     }
-
-    newDesc.MipLODBias = std::clamp(newDesc.MipLODBias, -16.0f, 15.99f);
 
     return o_CreateSamplerState(This, &newDesc, ppSamplerState);
 }

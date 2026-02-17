@@ -97,6 +97,7 @@ class State
     Sl_Inputs_Dx12 slFGInputs = {};
 
     // OptiFG
+    bool FGPresentIsCalled = false;
     bool FGonlyGenerated = false;
     bool FGHudlessCompare = false;
     bool FGchanged = false;

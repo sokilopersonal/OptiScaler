@@ -14,6 +14,7 @@ class DepthTransfer_Vk : public Shader_Vk
     VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
     std::vector<VkDescriptorSet> _descriptorSets;
     int _currentSetIndex = 0;
+    bool _isInteger = false;
 
     // VkSampler _nearestSampler = VK_NULL_HANDLE;
 

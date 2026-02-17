@@ -81,8 +81,8 @@ DepthTransfer_Vk::DepthTransfer_Vk(std::string InName, VkDevice InDevice, VkPhys
 
     // Load precompiled shader based on format
     std::vector<char> shaderCode;
-
-    if (IsIntegerFormat(InFormat))
+    _isInteger = IsIntegerFormat(InFormat);
+    if (_isInteger)
     {
         LOG_INFO("[{0}] Using integer shader for format", _name);
         shaderCode = std::vector<char>(dt_int_spv, dt_int_spv + sizeof(dt_int_spv));
@@ -140,7 +140,7 @@ void DepthTransfer_Vk::CreateDescriptorSetLayout()
     // Binding 0: Source (Storage Image - for direct read without sampling)
     VkDescriptorSetLayoutBinding sourceLayoutBinding {};
     sourceLayoutBinding.binding = 0;
-    sourceLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    sourceLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     sourceLayoutBinding.descriptorCount = 1;
     sourceLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
@@ -177,8 +177,10 @@ void DepthTransfer_Vk::CreateDescriptorSetLayout()
 
 void DepthTransfer_Vk::CreateDescriptorPool()
 {
-    std::vector<VkDescriptorPoolSize> poolSizes = { { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                                                      static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2) } };
+    std::vector<VkDescriptorPoolSize> poolSizes = {
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 1) },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 1) }
+    };
 
     VkDescriptorPoolCreateInfo poolInfo {};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -215,7 +217,7 @@ void DepthTransfer_Vk::UpdateDescriptorSet(VkCommandBuffer cmdList, int setIndex
 
     // 0: Source (Storage Image)
     VkDescriptorImageInfo sourceInfo {};
-    sourceInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    sourceInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     sourceInfo.imageView = inputView;
     sourceInfo.sampler = VK_NULL_HANDLE;
 
@@ -224,7 +226,7 @@ void DepthTransfer_Vk::UpdateDescriptorSet(VkCommandBuffer cmdList, int setIndex
     descriptorWriteSource.dstSet = descriptorSet;
     descriptorWriteSource.dstBinding = 0;
     descriptorWriteSource.dstArrayElement = 0;
-    descriptorWriteSource.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descriptorWriteSource.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     descriptorWriteSource.descriptorCount = 1;
     descriptorWriteSource.pImageInfo = &sourceInfo;
 

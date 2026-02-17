@@ -172,6 +172,8 @@ static void ApplySamplerOverrides(D3D12_STATIC_SAMPLER_DESC& samplerDesc)
                     samplerDesc.MipLODBias = samplerDesc.MipLODBias * Config::Instance()->MipmapBiasOverride.value();
                 else
                     samplerDesc.MipLODBias = samplerDesc.MipLODBias + Config::Instance()->MipmapBiasOverride.value();
+
+                samplerDesc.MipLODBias = std::clamp(samplerDesc.MipLODBias, -16.0f, 15.99f);
             }
 
             if (State::Instance().lastMipBiasMax < samplerDesc.MipLODBias)
@@ -181,8 +183,6 @@ static void ApplySamplerOverrides(D3D12_STATIC_SAMPLER_DESC& samplerDesc)
                 State::Instance().lastMipBias = samplerDesc.MipLODBias;
         }
     }
-
-    samplerDesc.MipLODBias = std::clamp(samplerDesc.MipLODBias, -16.0f, 15.99f);
 
     if (Config::Instance()->AnisotropyOverride.has_value())
     {

@@ -23,6 +23,14 @@ class IFeature_VkwDx12 : public virtual IFeature_Vk
 {
   protected:
     // Vulkan with D3D12 interop structures
+    using QUERY_INDEX_BUFFERS = struct QUERY_INDEX_BUFFERS
+    {
+        VkCommandBuffer VulkanCopyCommandBuffer[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+        VkCommandPool VulkanCopyCommandPool[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+        VkCommandBuffer VulkanBarrierCommandBuffer[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+        VkCommandPool VulkanBarrierCommandPool[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+    };
+
     using VK_TEXTURE2D_RESOURCE_C = struct VK_TEXTURE2D_RESOURCE_C
     {
         VkFormat Format = VK_FORMAT_UNDEFINED;
@@ -46,11 +54,8 @@ class IFeature_VkwDx12 : public virtual IFeature_Vk
     VkPhysicalDevice VulkanPhysicalDevice = VK_NULL_HANDLE;
     VkInstance VulkanInstance = VK_NULL_HANDLE;
     VkQueue VulkanGraphicsQueue = VK_NULL_HANDLE;
-    VkCommandBuffer VulkanCopyCommandBuffer[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
-    VkCommandPool VulkanCopyCommandPool[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
-    VkCommandBuffer VulkanBarrierCommandBuffer[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
-    VkCommandPool VulkanBarrierCommandPool[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
-    uint32_t VulkanQueueFamilyIndex = 0;
+    std::map<uint32_t, QUERY_INDEX_BUFFERS> VulkanQueueCommandBuffers;
+    uint32_t ActiveQueueFamilyIndex = 9999;
 
     PFN_vkGetInstanceProcAddr VulkanGIPA = nullptr;
     PFN_vkGetDeviceProcAddr VulkanGDPA = nullptr;
@@ -115,9 +120,8 @@ class IFeature_VkwDx12 : public virtual IFeature_Vk
     uint32_t FindVulkanMemoryTypeIndex(uint32_t MemoryTypeBits, VkMemoryPropertyFlags PropertyFlags);
 
     bool LoadVulkanExternalMemoryFunctions();
-    bool CreateVulkanCopyCommandBuffer();
+    bool CreateVulkanCommandBuffers(uint32_t queueFamilyIndex);
     bool CreateSharedFenceSemaphore();
-    void RecreateCommandBuffersForQueueFamily(uint32_t queueFamily);
 
     void ReleaseSharedResources();
     void ReleaseSyncResources();

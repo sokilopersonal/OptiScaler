@@ -1306,6 +1306,12 @@ static void printQuirks(flag_set<GameQuirk>& quirks)
         state->detectedQuirks.push_back("Disable Resize Skip");
     }
 
+    if (quirks & GameQuirk::SpoofRegistry)
+    {
+        spdlog::info("Quirk: Spoof Registry");
+        state->detectedQuirks.push_back("Spoof Registry");
+    }
+
     return;
 }
 
@@ -1457,6 +1463,11 @@ static void CheckQuirks()
     if (quirks & GameQuirk::DisableResizeSkip && !Config::Instance()->FGXeFGSkipResizeBuffers.has_value())
     {
         Config::Instance()->FGXeFGSkipResizeBuffers.set_volatile_value(false);
+    }
+
+    if (quirks & GameQuirk::SpoofRegistry && !Config::Instance()->SpoofRegistry.has_value())
+    {
+        Config::Instance()->SpoofRegistry.set_volatile_value(true);
     }
 
     // For Luma, we assume if Luma addon in game folder it's used
@@ -1749,13 +1760,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         State::Instance().isRunningOnLinux = IsRunningOnWine();
         State::Instance().isRunningOnDXVK = State::Instance().isRunningOnLinux;
 
-        spdlog::info("");
-        CheckQuirks();
-
-        // Check for working mode and attach hooks
-        spdlog::info("");
-        CheckWorkingMode();
-
         // Check if real DLSS available
         if (Config::Instance()->DLSSEnabled.value_or_default())
         {
@@ -1803,6 +1807,13 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
             spdlog::info("Not running on Nvidia, disabling DLSS");
             Config::Instance()->DLSSEnabled.set_volatile_value(false);
         }
+
+        spdlog::info("");
+        CheckQuirks();
+
+        // Check for working mode and attach hooks
+        spdlog::info("");
+        CheckWorkingMode();
 
         // OptiFG & Overlay Checks
         // TODO: Either FGInput == FGInput::Upscaler or FGOutput == FGOutput::FSRFG

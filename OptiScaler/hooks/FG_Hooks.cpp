@@ -950,6 +950,10 @@ HRESULT FGHooks::FGPresent(void* This, UINT SyncInterval, UINT Flags, const DXGI
         LOG_DEBUG("Final SyncInterval: {}", SyncInterval);
     }
 
+    // Used at wrapped_swapchain LocalPresent to determine is frame is interpolated or not
+    if (willPresent)
+        State::Instance().FGPresentIsCalled = true;
+
     HRESULT result;
     if (pPresentParameters == nullptr)
         result = o_FGSCPresent(This, SyncInterval, Flags);

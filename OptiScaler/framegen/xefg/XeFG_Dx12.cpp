@@ -1084,7 +1084,7 @@ bool XeFG_Dx12::SetResource(Dx12Resource* inputResource)
 
     auto& type = inputResource->type;
 
-    std::lock_guard<std::mutex> lock(_frMutex);
+    std::unique_lock<std::shared_mutex> lock(_resourceMutex[fIndex]);
 
     if (type == FG_ResourceType::HudlessColor)
     {

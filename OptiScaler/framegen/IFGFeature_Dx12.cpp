@@ -40,8 +40,6 @@ ID3D12CommandQueue* IFGFeature_Dx12::GetCommandQueue() { return _gameCommandQueu
 
 bool IFGFeature_Dx12::HasResource(FG_ResourceType type, int index)
 {
-    std::lock_guard<std::mutex> lock(_frMutex);
-
     if (index < 0)
         index = GetIndex();
 
@@ -105,13 +103,10 @@ ID3D12GraphicsCommandList* IFGFeature_Dx12::GetUICommandList(int index)
 
 Dx12Resource* IFGFeature_Dx12::GetResource(FG_ResourceType type, int index)
 {
-    std::lock_guard<std::mutex> lock(_frMutex);
-
-    // if (_resourceFrame[type] != _frameCount)
-    //     return nullptr;
-
     if (index < 0)
         index = GetIndex();
+
+    std::shared_lock<std::shared_mutex> lock(_resourceMutex[index]);
 
     if (!_frameResources[index].contains(type))
         return nullptr;
@@ -135,7 +130,7 @@ void IFGFeature_Dx12::NewFrame()
 
     auto fIndex = GetIndex();
 
-    std::lock_guard<std::mutex> lock(_frMutex);
+    std::unique_lock<std::shared_mutex> lock(_resourceMutex[fIndex]);
 
     LOG_DEBUG("_frameCount: {}, fIndex: {}", _frameCount, fIndex);
 

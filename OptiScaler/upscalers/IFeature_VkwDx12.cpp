@@ -77,6 +77,21 @@ static bool IsDepthFormat(VkFormat format)
     }
 }
 
+static bool HasStencil(VkFormat format)
+{
+    switch (format)
+    {
+    case VK_FORMAT_X8_D24_UNORM_PACK32:
+    case VK_FORMAT_D16_UNORM_S8_UINT:
+    case VK_FORMAT_D24_UNORM_S8_UINT:
+    case VK_FORMAT_D32_SFLOAT_S8_UINT:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
 // Helper function to convert Vulkan formats to DXGI formats
 static DXGI_FORMAT VkFormatToDxgiFormat(VkFormat vkFormat)
 {
@@ -303,20 +318,27 @@ bool IFeature_VkwDx12::LoadVulkanExternalMemoryFunctions()
     return result;
 }
 
-bool IFeature_VkwDx12::CreateVulkanCopyCommandBuffer()
+bool IFeature_VkwDx12::CreateVulkanCommandBuffers(uint32_t queueFamilyIndex)
 {
     LOG_FUNC();
 
+    if (VulkanQueueCommandBuffers.contains(queueFamilyIndex))
+        return true;
+
+    VulkanQueueCommandBuffers.emplace(queueFamilyIndex, QUERY_INDEX_BUFFERS {});
+
+    auto& b = VulkanQueueCommandBuffers[queueFamilyIndex];
+
     for (uint32_t i = 0; i < 2; i++)
     {
-        if (VulkanCopyCommandPool[i] == VK_NULL_HANDLE)
+        if (b.VulkanCopyCommandPool[i] == VK_NULL_HANDLE)
         {
             VkCommandPoolCreateInfo poolInfo = {};
             poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-            poolInfo.queueFamilyIndex = VulkanQueueFamilyIndex;
+            poolInfo.queueFamilyIndex = queueFamilyIndex;
             poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-            VkResult result = vkCreateCommandPool(VulkanDevice, &poolInfo, nullptr, &VulkanCopyCommandPool[i]);
+            VkResult result = vkCreateCommandPool(VulkanDevice, &poolInfo, nullptr, &b.VulkanCopyCommandPool[i]);
             if (result != VK_SUCCESS)
             {
                 LOG_ERROR("vkCreateCommandPool error: {0:x}", (int) result);
@@ -324,20 +346,20 @@ bool IFeature_VkwDx12::CreateVulkanCopyCommandBuffer()
             }
 
 #ifdef VULKAN_DEBUG_LAYER
-            SetVkObjectName(VulkanDevice, VK_OBJECT_TYPE_COMMAND_POOL, (uint64_t) VulkanCopyCommandPool[i],
+            SetVkObjectName(VulkanDevice, VK_OBJECT_TYPE_COMMAND_POOL, (uint64_t) b.VulkanCopyCommandPool[i],
                             "VulkanCopyCommandPool");
 #endif
         }
 
-        if (VulkanCopyCommandBuffer[i] == VK_NULL_HANDLE)
+        if (b.VulkanCopyCommandBuffer[i] == VK_NULL_HANDLE)
         {
             VkCommandBufferAllocateInfo allocInfo = {};
             allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-            allocInfo.commandPool = VulkanCopyCommandPool[i];
+            allocInfo.commandPool = b.VulkanCopyCommandPool[i];
             allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
             allocInfo.commandBufferCount = 1;
 
-            VkResult result = vkAllocateCommandBuffers(VulkanDevice, &allocInfo, &VulkanCopyCommandBuffer[i]);
+            VkResult result = vkAllocateCommandBuffers(VulkanDevice, &allocInfo, &b.VulkanCopyCommandBuffer[i]);
             if (result != VK_SUCCESS)
             {
                 LOG_ERROR("vkAllocateCommandBuffers error: {0:x}", (int) result);
@@ -350,14 +372,14 @@ bool IFeature_VkwDx12::CreateVulkanCopyCommandBuffer()
 #endif
         }
 
-        if (VulkanBarrierCommandPool[i] == VK_NULL_HANDLE)
+        if (b.VulkanBarrierCommandPool[i] == VK_NULL_HANDLE)
         {
             VkCommandPoolCreateInfo poolInfo = {};
             poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-            poolInfo.queueFamilyIndex = VulkanQueueFamilyIndex;
+            poolInfo.queueFamilyIndex = queueFamilyIndex;
             poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-            VkResult result = vkCreateCommandPool(VulkanDevice, &poolInfo, nullptr, &VulkanBarrierCommandPool[i]);
+            VkResult result = vkCreateCommandPool(VulkanDevice, &poolInfo, nullptr, &b.VulkanBarrierCommandPool[i]);
             if (result != VK_SUCCESS)
             {
                 LOG_ERROR("vkCreateCommandPool error: {0:x}", (int) result);
@@ -370,15 +392,15 @@ bool IFeature_VkwDx12::CreateVulkanCopyCommandBuffer()
 #endif
         }
 
-        if (VulkanBarrierCommandBuffer[i] == VK_NULL_HANDLE)
+        if (b.VulkanBarrierCommandBuffer[i] == VK_NULL_HANDLE)
         {
             VkCommandBufferAllocateInfo allocInfo = {};
             allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-            allocInfo.commandPool = VulkanBarrierCommandPool[i];
+            allocInfo.commandPool = b.VulkanBarrierCommandPool[i];
             allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
             allocInfo.commandBufferCount = 1;
 
-            VkResult result = vkAllocateCommandBuffers(VulkanDevice, &allocInfo, &VulkanBarrierCommandBuffer[i]);
+            VkResult result = vkAllocateCommandBuffers(VulkanDevice, &allocInfo, &b.VulkanBarrierCommandBuffer[i]);
             if (result != VK_SUCCESS)
             {
                 LOG_ERROR("vkAllocateCommandBuffers error: {0:x}", (int) result);
@@ -543,11 +565,15 @@ bool IFeature_VkwDx12::CreateSharedTexture(const VkImageCreateInfo& ImageInfo, V
 
     VkMemoryPropertyFlags memoryFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
+    uint32_t allowedBits = memoryRequirements.memoryTypeBits & memoryWin32HandleProperties.memoryTypeBits;
+
+    uint32_t typeIndex = FindVulkanMemoryTypeIndex(allowedBits, memoryFlags);
+
     const VkMemoryAllocateInfo memoryAllocInfo = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .pNext = &importMemoryWin32HandleInfo,
         .allocationSize = memoryRequirements.size,
-        .memoryTypeIndex = FindVulkanMemoryTypeIndex(memoryWin32HandleProperties.memoryTypeBits, memoryFlags),
+        .memoryTypeIndex = typeIndex,
     };
 
     if (memoryAllocInfo.memoryTypeIndex == 0xFFFFFFFF)
@@ -655,8 +681,10 @@ bool IFeature_VkwDx12::CopyTextureFromVkToDx12(VkCommandBuffer InCmdBuffer, NVSD
         imageCreateInfo.arrayLayers = 1;
         imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+
         imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
                                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
         imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -718,11 +746,19 @@ bool IFeature_VkwDx12::CopyTextureFromVkToDx12(VkCommandBuffer InCmdBuffer, NVSD
 
             imageBarriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             imageBarriers[1].oldLayout = OutResource->VkSourceImageLayout;
-            imageBarriers[1].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+            imageBarriers[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             imageBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             imageBarriers[1].image = InParam->Resource.ImageViewInfo.Image;
-            imageBarriers[1].subresourceRange = InParam->Resource.ImageViewInfo.SubresourceRange;
+            imageBarriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+            if (HasStencil(InParam->Resource.ImageViewInfo.Format))
+                imageBarriers[1].subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+            imageBarriers[1].subresourceRange.baseMipLevel = 0;
+            imageBarriers[1].subresourceRange.levelCount = 1;
+            imageBarriers[1].subresourceRange.baseArrayLayer = 0;
+            imageBarriers[1].subresourceRange.layerCount = 1;
             imageBarriers[1].srcAccessMask = OutResource->VkSourceImageAccess;
             imageBarriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -922,55 +958,6 @@ static bool NvVkResourceNotValid(NVSDK_NGX_Resource_VK* param)
            param->Resource.ImageViewInfo.Height == 0;
 }
 
-void IFeature_VkwDx12::RecreateCommandBuffersForQueueFamily(uint32_t queueFamily)
-{
-    LOG_DEBUG("Recreating command buffers for queue family {}", queueFamily);
-
-    // Update the queue family index
-    uint32_t oldFamily = VulkanQueueFamilyIndex;
-    VulkanQueueFamilyIndex = queueFamily;
-
-    // Destroy old command pools/buffers
-    for (uint32_t i = 0; i < 2; i++)
-    {
-        if (VulkanCopyCommandBuffer[i] != VK_NULL_HANDLE)
-        {
-            vkFreeCommandBuffers(VulkanDevice, VulkanCopyCommandPool[i], 1, &VulkanCopyCommandBuffer[i]);
-            VulkanCopyCommandBuffer[i] = VK_NULL_HANDLE;
-        }
-
-        if (VulkanCopyCommandPool[i] != VK_NULL_HANDLE)
-        {
-            vkDestroyCommandPool(VulkanDevice, VulkanCopyCommandPool[i], nullptr);
-            VulkanCopyCommandPool[i] = VK_NULL_HANDLE;
-        }
-
-        if (VulkanBarrierCommandBuffer[i] != VK_NULL_HANDLE)
-        {
-            vkFreeCommandBuffers(VulkanDevice, VulkanBarrierCommandPool[i], 1, &VulkanBarrierCommandBuffer[i]);
-            VulkanBarrierCommandBuffer[i] = VK_NULL_HANDLE;
-        }
-
-        if (VulkanBarrierCommandPool[i] != VK_NULL_HANDLE)
-        {
-            vkDestroyCommandPool(VulkanDevice, VulkanBarrierCommandPool[i], nullptr);
-            VulkanBarrierCommandPool[i] = VK_NULL_HANDLE;
-        }
-    }
-
-    // Recreate with new queue family (CreateVulkanCopyCommandBuffer uses VulkanQueueFamilyIndex)
-    if (!CreateVulkanCopyCommandBuffer())
-    {
-        LOG_ERROR("Failed to recreate command buffers for queue family {}", queueFamily);
-        VulkanQueueFamilyIndex = oldFamily; // Restore old value on failure
-        CreateVulkanCopyCommandBuffer();
-    }
-    else
-    {
-        LOG_DEBUG("Successfully recreated command buffers for queue family {}", queueFamily);
-    }
-}
-
 bool IFeature_VkwDx12::ProcessVulkanTextures(VkCommandBuffer InCmdList, const NVSDK_NGX_Parameter* InParameters)
 {
     LOG_FUNC();
@@ -987,19 +974,25 @@ bool IFeature_VkwDx12::ProcessVulkanTextures(VkCommandBuffer InCmdList, const NV
         LOG_DEBUG("Command buffer {:X} belongs to queue family {}", (size_t) InCmdList, cmdBufferQueueFamily);
 
         // Check if it matches your command pools
-        if (cmdBufferQueueFamily != VulkanQueueFamilyIndex)
+        if (cmdBufferQueueFamily != ActiveQueueFamilyIndex)
         {
             LOG_WARN("Queue family mismatch detected! App uses family {}, we use family {}", cmdBufferQueueFamily,
-                     VulkanQueueFamilyIndex);
+                     ActiveQueueFamilyIndex);
 
             // Recreate command pools for the correct queue family
-            RecreateCommandBuffersForQueueFamily(cmdBufferQueueFamily);
+            if (!CreateVulkanCommandBuffers(cmdBufferQueueFamily))
+            {
+                LOG_ERROR("Failed to create Vulkan command buffers for queue family {}", cmdBufferQueueFamily);
+                return false;
+            }
+
+            ActiveQueueFamilyIndex = cmdBufferQueueFamily;
         }
     }
     else
     {
         LOG_WARN("Could not determine queue family for command buffer {:X}, using default {}", (size_t) InCmdList,
-                 VulkanQueueFamilyIndex);
+                 ActiveQueueFamilyIndex);
     }
 
     LOG_DEBUG("Upscaling command buffer: {:X}, frame: {}", (size_t) InCmdList, frame);
@@ -1297,10 +1290,18 @@ bool IFeature_VkwDx12::ProcessVulkanTextures(VkCommandBuffer InCmdList, const NV
     LOG_DEBUG("Signaling Vulkan semaphore with value: {}", Vulkan_wDx12::signalValueResourceCopy);
 
     {
-        if (!CreateVulkanCopyCommandBuffer())
-            return false;
+        if (!VulkanQueueCommandBuffers.contains(ActiveQueueFamilyIndex))
+        {
+            if (!CreateVulkanCommandBuffers(ActiveQueueFamilyIndex))
+            {
+                LOG_ERROR("Failed to create Vulkan command buffers for queue family {}", ActiveQueueFamilyIndex);
+                return false;
+            }
+        }
 
-        auto vkResult = vkResetCommandBuffer(VulkanBarrierCommandBuffer[frame], 0);
+        auto& b = VulkanQueueCommandBuffers[ActiveQueueFamilyIndex];
+
+        auto vkResult = vkResetCommandBuffer(b.VulkanBarrierCommandBuffer[frame], 0);
         if (vkResult != VK_SUCCESS)
         {
             LOG_ERROR("vkResetCommandBuffer error: {0:x}", (int) vkResult);
@@ -1311,7 +1312,7 @@ bool IFeature_VkwDx12::ProcessVulkanTextures(VkCommandBuffer InCmdList, const NV
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        vkResult = vkBeginCommandBuffer(VulkanBarrierCommandBuffer[frame], &beginInfo);
+        vkResult = vkBeginCommandBuffer(b.VulkanBarrierCommandBuffer[frame], &beginInfo);
         if (vkResult != VK_SUCCESS)
         {
             LOG_ERROR("vkBeginCommandBuffer error: {0:x}", (int) vkResult);
@@ -1319,7 +1320,7 @@ bool IFeature_VkwDx12::ProcessVulkanTextures(VkCommandBuffer InCmdList, const NV
         }
 
         // std::lock_guard<std::mutex> lock(Vulkan_wDx12::cmdBufferMutex);
-        Vulkan_wDx12::virtualCmdBuffer = VulkanBarrierCommandBuffer[frame];
+        Vulkan_wDx12::virtualCmdBuffer = b.VulkanBarrierCommandBuffer[frame];
 
         // Configure replay parameters
         vk_state::ReplayParams params {};
@@ -1333,7 +1334,8 @@ bool IFeature_VkwDx12::ProcessVulkanTextures(VkCommandBuffer InCmdList, const NV
         params.OverrideGraphicsLayout = VK_NULL_HANDLE;
 
         // Simple one-line call using cached function table
-        if (!Vulkan_wDx12::cmdBufferStateTracker.CaptureAndReplay(InCmdList, VulkanBarrierCommandBuffer[frame], params))
+        if (!Vulkan_wDx12::cmdBufferStateTracker.CaptureAndReplay(InCmdList, b.VulkanBarrierCommandBuffer[frame],
+                                                                  params))
         {
             LOG_WARN("Failed to capture and replay command buffer state or state is empty");
         }
@@ -1357,7 +1359,7 @@ bool IFeature_VkwDx12::ProcessVulkanTextures(VkCommandBuffer InCmdList, const NV
         imageBarrier.srcAccessMask = vkOut.VkSourceImageAccess;
         imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 
-        vkCmdPipelineBarrier(VulkanBarrierCommandBuffer[frame], VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        vkCmdPipelineBarrier(b.VulkanBarrierCommandBuffer[frame], VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                              VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageBarrier);
     }
 
@@ -1478,7 +1480,18 @@ bool IFeature_VkwDx12::CopyBackOutput()
     {
         LOG_DEBUG("Copying output from shared image back to source image");
 
-        VkResult vkResult = vkResetCommandBuffer(VulkanCopyCommandBuffer[frame], 0);
+        if (!VulkanQueueCommandBuffers.contains(ActiveQueueFamilyIndex))
+        {
+            if (!CreateVulkanCommandBuffers(ActiveQueueFamilyIndex))
+            {
+                LOG_ERROR("Failed to create Vulkan command buffers for queue family {}", ActiveQueueFamilyIndex);
+                return false;
+            }
+        }
+
+        auto& b = VulkanQueueCommandBuffers[ActiveQueueFamilyIndex];
+
+        VkResult vkResult = vkResetCommandBuffer(b.VulkanCopyCommandBuffer[frame], 0);
         if (vkResult != VK_SUCCESS)
         {
             LOG_ERROR("vkResetCommandBuffer error: {0:x}", (int) vkResult);
@@ -1489,7 +1502,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        vkResult = vkBeginCommandBuffer(VulkanCopyCommandBuffer[frame], &beginInfo);
+        vkResult = vkBeginCommandBuffer(b.VulkanCopyCommandBuffer[frame], &beginInfo);
         if (vkResult != VK_SUCCESS)
         {
             LOG_ERROR("vkBeginCommandBuffer error: {0:x}", (int) vkResult);
@@ -1527,7 +1540,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
         AddVkBarrier(&vkExp);
         AddVkBarrier(&vkReactive);
 
-        vkCmdPipelineBarrier(VulkanCopyCommandBuffer[frame], VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        vkCmdPipelineBarrier(b.VulkanCopyCommandBuffer[frame], VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                              VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
                              static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data());
 
@@ -1555,7 +1568,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
             vkOut.VkSharedImageAccess = imageBarrier.dstAccessMask;
 
             // Single batched barrier call for pre-copy transitions
-            vkCmdPipelineBarrier(VulkanCopyCommandBuffer[frame], VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            vkCmdPipelineBarrier(b.VulkanCopyCommandBuffer[frame], VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageBarrier);
 
             if (!OutCopy->CanRender())
@@ -1587,7 +1600,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
 
             // Dispatch resource copy compute shader
             VkExtent2D extent = { vkOut.Width, vkOut.Height };
-            if (!OutCopy->Dispatch(VulkanDevice, VulkanCopyCommandBuffer[frame], vkOut.VkSharedImageView,
+            if (!OutCopy->Dispatch(VulkanDevice, b.VulkanCopyCommandBuffer[frame], vkOut.VkSharedImageView,
                                    vkOut.VkSourceImageView, extent))
             {
                 LOG_ERROR("Failed to dispatch resource copy!");
@@ -1628,7 +1641,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
             imageBarriers[1].srcAccessMask = vkOut.VkSourceImageAccess;
             imageBarriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
-            vkCmdPipelineBarrier(VulkanCopyCommandBuffer[frame], VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            vkCmdPipelineBarrier(b.VulkanCopyCommandBuffer[frame], VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                  VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 2, imageBarriers);
 
             // Copy shared to source
@@ -1641,7 +1654,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
             copyRegion.dstSubresource.layerCount = imageBarriers[0].subresourceRange.layerCount;
             copyRegion.srcSubresource = copyRegion.dstSubresource;
 
-            vkCmdCopyImage(VulkanCopyCommandBuffer[frame], imageBarriers[0].image, imageBarriers[0].newLayout,
+            vkCmdCopyImage(b.VulkanCopyCommandBuffer[frame], imageBarriers[0].image, imageBarriers[0].newLayout,
                            imageBarriers[1].image, imageBarriers[1].newLayout, 1, &copyRegion);
 
             // Shared
@@ -1655,7 +1668,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
             imageBarriers[1].srcAccessMask = imageBarriers[1].dstAccessMask;
             imageBarriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 
-            vkCmdPipelineBarrier(VulkanCopyCommandBuffer[frame], VK_PIPELINE_STAGE_TRANSFER_BIT,
+            vkCmdPipelineBarrier(b.VulkanCopyCommandBuffer[frame], VK_PIPELINE_STAGE_TRANSFER_BIT,
                                  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 2, imageBarriers);
 
             vkOut.VkSharedImageLayout = imageBarriers[0].newLayout;
@@ -1665,7 +1678,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
         }
 
         // Close virtual command buffer
-        vkResult = vkEndCommandBuffer(VulkanCopyCommandBuffer[frame]);
+        vkResult = vkEndCommandBuffer(b.VulkanCopyCommandBuffer[frame]);
         if (vkResult != VK_SUCCESS)
         {
             LOG_ERROR("vkEndCommandBuffer error: {0:x}", (int) vkResult);
@@ -1695,7 +1708,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
         Vulkan_wDx12::copyBackSubmitInfo.signalSemaphoreCount = 1;
         Vulkan_wDx12::copyBackSubmitInfo.pSignalSemaphores = &vkSemaphoreCopyBack[frame];
         Vulkan_wDx12::copyBackSubmitInfo.commandBufferCount = 1;
-        Vulkan_wDx12::copyBackSubmitInfo.pCommandBuffers = &VulkanCopyCommandBuffer[frame];
+        Vulkan_wDx12::copyBackSubmitInfo.pCommandBuffers = &b.VulkanCopyCommandBuffer[frame];
 
         // This is for syncing with copy back
         Vulkan_wDx12::syncTimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
@@ -1715,7 +1728,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
         Vulkan_wDx12::syncSubmitInfo.signalSemaphoreCount = 0;
         Vulkan_wDx12::syncSubmitInfo.pSignalSemaphores = nullptr;
         Vulkan_wDx12::syncSubmitInfo.commandBufferCount = 1;
-        Vulkan_wDx12::syncSubmitInfo.pCommandBuffers = &VulkanBarrierCommandBuffer[frame];
+        Vulkan_wDx12::syncSubmitInfo.pCommandBuffers = &b.VulkanBarrierCommandBuffer[frame];
 
         // Trigger the injection on next vkQueueSubmit
         Vulkan_wDx12::commandBufferFoundCount = 0;
@@ -1786,20 +1799,38 @@ void IFeature_VkwDx12::ReleaseSharedResources()
     }
 
     // Cleanup Vulkan copy command buffer
-    for (size_t i = 0; i < 2; i++)
+    // Loop in VulkanQueueCommandBuffers instead of hardcoding 2 command buffers, in case we have more in the future
+    for (auto& [index, b] : VulkanQueueCommandBuffers)
     {
-        if (VulkanCopyCommandBuffer[i] != VK_NULL_HANDLE && VulkanCopyCommandPool[i] != VK_NULL_HANDLE)
+        for (size_t i = 0; i < 2; i++)
         {
-            vkFreeCommandBuffers(VulkanDevice, VulkanCopyCommandPool[i], 1, &VulkanCopyCommandBuffer[i]);
-            VulkanCopyCommandBuffer[i] = VK_NULL_HANDLE;
-        }
+            if (b.VulkanBarrierCommandBuffer[i] != VK_NULL_HANDLE && b.VulkanBarrierCommandPool[i] != VK_NULL_HANDLE)
+            {
+                vkFreeCommandBuffers(VulkanDevice, b.VulkanBarrierCommandPool[i], 1, &b.VulkanBarrierCommandBuffer[i]);
+                b.VulkanBarrierCommandBuffer[i] = VK_NULL_HANDLE;
+            }
 
-        if (VulkanCopyCommandPool[i] != VK_NULL_HANDLE)
-        {
-            vkDestroyCommandPool(VulkanDevice, VulkanCopyCommandPool[i], nullptr);
-            VulkanCopyCommandPool[i] = VK_NULL_HANDLE;
+            if (b.VulkanBarrierCommandPool[i] != VK_NULL_HANDLE)
+            {
+                vkDestroyCommandPool(VulkanDevice, b.VulkanBarrierCommandPool[i], nullptr);
+                b.VulkanBarrierCommandPool[i] = VK_NULL_HANDLE;
+            }
+
+            if (b.VulkanCopyCommandBuffer[i] != VK_NULL_HANDLE && b.VulkanCopyCommandPool[i] != VK_NULL_HANDLE)
+            {
+                vkFreeCommandBuffers(VulkanDevice, b.VulkanCopyCommandPool[i], 1, &b.VulkanCopyCommandBuffer[i]);
+                b.VulkanCopyCommandBuffer[i] = VK_NULL_HANDLE;
+            }
+
+            if (b.VulkanCopyCommandPool[i] != VK_NULL_HANDLE)
+            {
+                vkDestroyCommandPool(VulkanDevice, b.VulkanCopyCommandPool[i], nullptr);
+                b.VulkanCopyCommandPool[i] = VK_NULL_HANDLE;
+            }
         }
     }
+
+    VulkanQueueCommandBuffers.clear();
 
     ReleaseSyncResources();
 
@@ -2127,6 +2158,7 @@ bool IFeature_VkwDx12::BaseInit(VkInstance InInstance, VkPhysicalDevice InPD, Vk
     }
 
     // Get queue info
+    /*
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(VulkanPhysicalDevice, &queueFamilyCount, nullptr);
 
@@ -2154,6 +2186,7 @@ bool IFeature_VkwDx12::BaseInit(VkInstance InInstance, VkPhysicalDevice InPD, Vk
     vkGetDeviceQueue(VulkanDevice, VulkanQueueFamilyIndex, 0, &VulkanGraphicsQueue);
 
     LOG_DEBUG("VulkanGraphicsQueue: {:X}", (size_t) VulkanGraphicsQueue);
+    */
 
     // Create D3D12 device
     auto result = CreateDx12Device();

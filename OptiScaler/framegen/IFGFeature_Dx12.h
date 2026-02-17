@@ -55,7 +55,7 @@ class IFGFeature_Dx12 : public virtual IFGFeature
 
     std::unordered_map<FG_ResourceType, Dx12Resource> _frameResources[BUFFER_COUNT] {};
     std::unordered_map<FG_ResourceType, ID3D12Resource*> _resourceCopy[BUFFER_COUNT] {};
-    std::mutex _frMutex;
+    std::shared_mutex _resourceMutex[BUFFER_COUNT];
 
     std::unique_ptr<RF_Dx12> _mvFlip;
     std::unique_ptr<RF_Dx12> _depthFlip;
