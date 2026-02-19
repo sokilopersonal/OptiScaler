@@ -659,6 +659,8 @@ ffxReturnCode_t FSRFG_Dx12::DispatchCallback(ffxDispatchDescFrameGeneration* par
 
 FSRFG_Dx12::~FSRFG_Dx12() { Shutdown(); }
 
+bool FSRFG_Dx12::SetInterpolatedFrameCount(UINT interpolatedFrameCount) { return true; }
+
 void* FSRFG_Dx12::FrameGenerationContext()
 {
     LOG_DEBUG("");

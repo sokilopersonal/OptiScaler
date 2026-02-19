@@ -111,9 +111,7 @@ static void hookGdi32()
 {
     LOG_FUNC();
 
-    if (Config::Instance()->SpoofHAGS.value_or_default() ||
-        Config::Instance()->FGInput.value_or_default() == FGInput::Nukems ||
-        Config::Instance()->FGInput.value_or_default() == FGInput::DLSSG)
+    if (Config::Instance()->SpoofHAGS.value_or_default())
     {
         o_D3DKMTQueryAdapterInfo =
             reinterpret_cast<PFN_D3DKMTQueryAdapterInfo>(DetourFindFunction("gdi32.dll", "D3DKMTQueryAdapterInfo"));

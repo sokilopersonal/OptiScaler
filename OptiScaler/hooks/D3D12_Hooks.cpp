@@ -896,6 +896,10 @@ static void HookToDevice(ID3D12Device* InDevice)
         if (o_CreateRootSignature != nullptr)
             DetourAttach(&(PVOID&) o_CreateRootSignature, hkCreateRootSignature);
 
+        // Will be used for tracking current d3d12 device too
+        if (o_D3D12DeviceRelease != nullptr)
+            DetourAttach(&(PVOID&) o_D3D12DeviceRelease, hkD3D12DeviceRelease);
+
         if (Config::Instance()->UESpoofIntelAtomics64.value_or_default())
         {
             if (o_CheckFeatureSupport != nullptr)
@@ -906,9 +910,6 @@ static void HookToDevice(ID3D12Device* InDevice)
 
             if (o_CreatePlacedResource != nullptr)
                 DetourAttach(&(PVOID&) o_CreatePlacedResource, hkCreatePlacedResource);
-
-            if (o_D3D12DeviceRelease != nullptr)
-                DetourAttach(&(PVOID&) o_D3D12DeviceRelease, hkD3D12DeviceRelease);
 
             if (o_GetResourceAllocationInfo != nullptr)
                 DetourAttach(&(PVOID&) o_GetResourceAllocationInfo, hkGetResourceAllocationInfo);

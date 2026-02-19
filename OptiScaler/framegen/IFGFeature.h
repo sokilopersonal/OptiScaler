@@ -73,6 +73,7 @@ class IFGFeature
     UINT64 _lastDispatchedFrame = 0;
     UINT64 _lastFGFrame = 0;
     bool _waitingNewFrameData = false;
+    UINT _framesToInterpolate = 1;
 
     bool _isActive = false;
     UINT64 _targetFrame = 0;
@@ -105,6 +106,7 @@ class IFGFeature
     virtual bool ReleaseSwapchain(HWND hwnd) = 0;
     virtual bool Shutdown() = 0;
     virtual bool HasResource(FG_ResourceType type, int index = -1) = 0;
+    virtual bool SetInterpolatedFrameCount(UINT interpolatedFrameCount) = 0;
 
     int GetIndex();
     int GetIndexWillBeDispatched();
@@ -144,6 +146,7 @@ class IFGFeature
     void SetInterpolationPos(UINT left, UINT top, int index = -1);
     void GetInterpolationPos(UINT& left, UINT& top, int index = -1);
     void SetResourceReady(FG_ResourceType type, int index = -1);
+    UINT GetInterpolatedFrameCount();
 
     void ResetCounters();
     void UpdateTarget();
@@ -152,5 +155,5 @@ class IFGFeature
     UINT64 TargetFrame();
     UINT64 LastDispatchedFrame();
 
-    IFGFeature() = default;
+    IFGFeature(UINT framesToInterpolate) { _framesToInterpolate = framesToInterpolate; }
 };

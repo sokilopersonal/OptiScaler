@@ -658,9 +658,13 @@ sl::Result StreamlineHooks::hkslDLSSGGetState(const sl::ViewportHandle& viewport
                 state.estimatedVRAMUsageInBytes = static_cast<uint64_t>(256 * 1024) * 1024;
 
             if (fg->IsActive() && !fg->IsPaused())
-                state.numFramesActuallyPresented = 2;
+            {
+                state.numFramesActuallyPresented = fg->GetInterpolatedFrameCount() + 1;
+            }
             else
+            {
                 state.numFramesActuallyPresented = 1;
+            }
         }
         else
         {

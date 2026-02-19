@@ -68,11 +68,14 @@ class XeFG_Dx12 : public virtual IFGFeature_Dx12
     void* SwapchainContext() override final;
     static void setFPSLimit(float fps);
 
-    XeFG_Dx12() : IFGFeature_Dx12(), IFGFeature()
+    XeFG_Dx12(UINT framesToInterpolate = 1) : IFGFeature_Dx12(), IFGFeature(framesToInterpolate)
     {
         if (XeFGProxy::Module() == nullptr)
             XeFGProxy::InitXeFG();
     }
 
     ~XeFG_Dx12();
+
+    // Inherited via IFGFeature_Dx12
+    bool SetInterpolatedFrameCount(UINT interpolatedFrameCount) override;
 };

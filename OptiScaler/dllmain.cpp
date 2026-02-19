@@ -1312,6 +1312,12 @@ static void printQuirks(flag_set<GameQuirk>& quirks)
         state->detectedQuirks.push_back("Spoof Registry");
     }
 
+    if (quirks & GameQuirk::DisableFakenvapi)
+    {
+        spdlog::info("Quirk: Disable fakenvapi");
+        state->detectedQuirks.push_back("Disable fakenvapi");
+    }
+
     return;
 }
 
@@ -1468,6 +1474,11 @@ static void CheckQuirks()
     if (quirks & GameQuirk::SpoofRegistry && !Config::Instance()->SpoofRegistry.has_value())
     {
         Config::Instance()->SpoofRegistry.set_volatile_value(true);
+    }
+
+    if (quirks & GameQuirk::DisableFakenvapi && !Config::Instance()->OverrideNvapiDll.has_value())
+    {
+        Config::Instance()->OverrideNvapiDll.set_volatile_value(false);
     }
 
     // For Luma, we assume if Luma addon in game folder it's used

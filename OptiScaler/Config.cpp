@@ -1247,6 +1247,13 @@ bool Config::SaveIni()
         ini.SetValue("Spoofing", "Registry", GetBoolValue(Instance()->SpoofRegistry.value_for_config()).c_str());
         ini.SetValue("Spoofing", "RegistryDriver",
                      wstring_to_string(Instance()->SpoofedDriver.value_for_config_or(L"auto")).c_str());
+
+        // Enable HAGS when DLSS-G will be used
+        if (!Instance()->SpoofHAGS.has_value())
+        {
+            Instance()->SpoofHAGS.set_volatile_value(Instance()->FGInput.value_or_default() == FGInput::Nukems ||
+                                                     Instance()->FGInput.value_or_default() == FGInput::DLSSG);
+        }
     }
 
     // Plugins

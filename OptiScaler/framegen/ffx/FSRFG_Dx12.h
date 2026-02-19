@@ -118,10 +118,13 @@ class FSRFG_Dx12 : public virtual IFGFeature_Dx12
 
     ffxReturnCode_t DispatchCallback(ffxDispatchDescFrameGeneration* params);
 
-    FSRFG_Dx12() : IFGFeature_Dx12(), IFGFeature()
+    FSRFG_Dx12(UINT framesToInterpolate = 1) : IFGFeature_Dx12(), IFGFeature(framesToInterpolate)
     {
         //
     }
 
     ~FSRFG_Dx12();
+
+    // Inherited via IFGFeature_Dx12
+    bool SetInterpolatedFrameCount(UINT interpolatedFrameCount) override;
 };

@@ -310,7 +310,7 @@ bool XeFG_Dx12::CreateSwapchain(IDXGIFactory* factory, ID3D12CommandQueue* cmdQu
 
     xefg_swapchain_d3d12_init_params_t params {};
 
-    auto intTarget = Config::Instance()->FGXeFGInterpolationCount.value_or_default();
+    auto intTarget = _framesToInterpolate;
 
     if (intTarget < 1 || intTarget > State::Instance().xefgMaxInterpolationCount)
     {
@@ -320,6 +320,7 @@ bool XeFG_Dx12::CreateSwapchain(IDXGIFactory* factory, ID3D12CommandQueue* cmdQu
         intTarget = 1;
     }
 
+    _framesToInterpolate = intTarget;
     params.maxInterpolatedFrames = intTarget;
 
     params.initFlags = XEFG_SWAPCHAIN_INIT_FLAG_NONE;
@@ -435,7 +436,7 @@ bool XeFG_Dx12::CreateSwapchain1(IDXGIFactory* factory, ID3D12CommandQueue* cmdQ
 
     xefg_swapchain_d3d12_init_params_t params {};
 
-    auto intTarget = Config::Instance()->FGXeFGInterpolationCount.value_or_default();
+    auto intTarget = _framesToInterpolate;
 
     if (intTarget < 1 || intTarget > State::Instance().xefgMaxInterpolationCount)
     {
@@ -445,6 +446,7 @@ bool XeFG_Dx12::CreateSwapchain1(IDXGIFactory* factory, ID3D12CommandQueue* cmdQ
         intTarget = 1;
     }
 
+    _framesToInterpolate = intTarget;
     params.maxInterpolatedFrames = intTarget;
 
     params.initFlags = XEFG_SWAPCHAIN_INIT_FLAG_NONE;
@@ -871,6 +873,8 @@ void XeFG_Dx12::setFPSLimit(float fps)
 }
 
 XeFG_Dx12::~XeFG_Dx12() { Shutdown(); }
+
+bool XeFG_Dx12::SetInterpolatedFrameCount(UINT interpolatedFrameCount) { return true; }
 
 void XeFG_Dx12::EvaluateState(ID3D12Device* device, FG_Constants& fgConstants)
 {
